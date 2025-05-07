@@ -176,3 +176,19 @@ docker cp 宿主机路径 容器名:容器内路径
 \o
 ```
 后面我还做了一个**数据目录挂载**，据说可以实现容器内外文件互通，但并没有起作用。所以就先这样吧。  
+
+<script src="https://giscus.app/client.js"
+        data-repo="Le1zyCatt/le1zycatt.github.io"
+        data-repo-id="R_kgDOORaJaw"
+        data-category="Announcements"
+        data-category-id="DIC_kwDOORaJa84Co8xd"
+        data-mapping="pathname"
+        data-strict="0"
+        data-reactions-enabled="1"
+        data-emit-metadata="0"
+        data-input-position="bottom"
+        data-theme="preferred_color_scheme"
+        data-lang="zh-CN"
+        crossorigin="anonymous"
+        async>
+</script>
