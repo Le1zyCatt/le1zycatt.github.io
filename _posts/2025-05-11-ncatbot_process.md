@@ -52,3 +52,18 @@ math: true
   
 group project的ddl是6.14，这周你们先看看代码学习一下（我自己也还在看www）。晚点计划把这个传到github上，想自己跑一遍的可以去pull，也可以直接找我。
 
+<script src="https://giscus.app/client.js"
+        data-repo="Le1zyCatt/le1zycatt.github.io"
+        data-repo-id="R_kgDOORaJaw"
+        data-category="Announcements"
+        data-category-id="DIC_kwDOORaJa84Co8xd"
+        data-mapping="pathname"
+        data-strict="0"
+        data-reactions-enabled="1"
+        data-emit-metadata="0"
+        data-input-position="bottom"
+        data-theme="preferred_color_scheme"
+        data-lang="zh-CN"
+        crossorigin="anonymous"
+        async>
+</script>
