@@ -87,7 +87,7 @@ docker ps
 此时容器就已经创建好了，并且应该是在运行中。接下来是**每次开机后运行容器的步骤**。  
 ```docker
 docker start opengauss
-exec -it opengauss bash //在bash窗口中打开opengauss容器。
+docker exec -it opengauss bash //在bash窗口中打开opengauss容器。
 ```
 此时就打开了**bash界面**。
 ```bash

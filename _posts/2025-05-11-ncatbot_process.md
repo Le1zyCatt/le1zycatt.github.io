@@ -2,7 +2,7 @@
 title: ncatbot聊天机器人
 date: 2025-05-11 13:00:00 +0800
 categories: [好玩的项目]
-tags: [chatbot，ncatbot]     # TAG names should always be lowercase
+tags: [chatbot,ncatbot]     # TAG names should always be lowercase
 author: lc
 description: >-
     基于ncatbot库的聊天机器人配置，拿来做计安大作业。

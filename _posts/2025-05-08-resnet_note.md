@@ -2,7 +2,7 @@
 title: SRP：深度学习笔记-Resnet-0508
 date: 2025-05-08 18:00:00 +0800
 categories: [SRP, 深度学习]
-tags: [Resnet，Resnext]     # TAG names should always be lowercase
+tags: [Resnet,Resnext]     # TAG names should always be lowercase
 author: lc
 description: >-
     本文记载了Resnet的创新点和Resnext的分组卷积思想。
