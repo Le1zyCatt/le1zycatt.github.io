@@ -1,5 +1,5 @@
 ---
-title: vllm+qlora本地部署微调1.5B大模型
+title: （推文施工中）vllm+qlora本地部署微调1.5B大模型
 date: 2025-07-09 15:00:00 +0800
 categories: [大模型]
 tags: [vllm， qlora]     # TAG names should always be lowercase
