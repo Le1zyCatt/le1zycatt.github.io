@@ -1,0 +1,15 @@
+---
+---
+
+@use "main";
+
+/* 限制代码块高度 */
+.highlight pre {
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+/* 横向滚动也保留 */
+.highlight {
+  overflow-x: auto;
+}

@@ -2,7 +2,7 @@
 title: 《python数据分析与挖掘实战》笔记
 date: 2025-07-14 19:00:00 +0800
 categories: [数学建模]
-tags: [python， 数据分析]     # TAG names should always be lowercase
+tags: [python, 数据分析]     # TAG names should always be lowercase
 author: lc
 description: >-
     数据分析。
@@ -61,6 +61,41 @@ data.describe() #显示分析结果，有非空值数、平均数、标准差、
 ![帕累托图](../assets/img/帕累托图.jpeg)  
 定律认为，20%的产品创造了80%的利润，也就是说当需要做抉择的时候，优先关注创造了80%利润或者前20%的产品。代码略过，可以使用.cumsum()函数绘制。  
 ## 6️⃣相关性分析（重点）
+### 一、绘制散点图矩阵
+画出多个变量之间的散点图。  
+### 二、计算相关系数（重点）
+pearson相关系数、spearman秩相关系数。  
+  
+如果两个变量具有严格单调的函数关系，则它们是完全spearman相关的。但是pearson则要求必须是线性关系。  
+  
+如果变量是正态分布的，则两种相关系数效率上等价；如果是连续的测量数据，则pearman相关系数更适合。  
+  
+**计算完相关系数后还需要做假设检验**（t检验方法）。  
+  
+相关系数的平方就是**判定系数**。  
+## 7️⃣一些统计作图函数
+大部分都是常用的，没见过的就是***误差条形图***，应该是绘制数据相对于均值的误差范围，和箱型图有相似之处。我觉得箱型图更好。  
+  
+# 3.数据预处理
+## 1️⃣数据清洗
+目的：  
+1. 删除无关数据、重复数据
+2. 平滑噪声数据
+3. 筛选掉无关数据
+4. 处理缺失值、异常值  
+
+### 一、缺失值处理
+共有三种处理方式：  
+1. 删除记录
+2. 数据插补
+3. 不处理
+
+
+
+
+
+
+
 <script src="https://giscus.app/client.js"
         data-repo="Le1zyCatt/le1zycatt.github.io"
         data-repo-id="R_kgDOORaJaw"
