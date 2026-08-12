@@ -70,7 +70,12 @@ refactor: true
             <div class="card-body d-flex flex-column">
               <h3 class="card-title my-2 mt-md-0">{{ post.title }}</h3>
               <div class="card-text content mt-0 mb-3">
-                <p>{% include post-description.html %}</p>
+                {% if post.description %}
+                  {% assign post_summary = post.description %}
+                {% else %}
+                  {% assign post_summary = post.content | markdownify | strip_html | strip_newlines %}
+                {% endif %}
+                <p>{{ post_summary | strip | truncate: 200 | escape }}</p>
               </div>
               <div class="post-meta flex-grow-1 d-flex align-items-end">
                 <div class="me-auto">
