@@ -2,6 +2,12 @@
 #
 # Run jekyll serve and then launch the site
 
+# Prefer Homebrew Ruby on Apple Silicon. macOS system Ruby is too old for the
+# Bundler version locked by this project.
+if [[ -x /opt/homebrew/opt/ruby/bin/ruby ]]; then
+  export PATH="/opt/homebrew/opt/ruby/bin:$PATH"
+fi
+
 prod=false
 command="bundle exec jekyll s -l"
 host="127.0.0.1"
@@ -41,6 +47,8 @@ while (($#)); do
 done
 
 command="$command -H $host"
+
+npm run build
 
 if $prod; then
   command="JEKYLL_ENV=production $command"

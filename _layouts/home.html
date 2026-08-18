@@ -42,6 +42,18 @@ refactor: true
   {% endfor %}
 {% endif %}
 
+<section class="immersive-gateway" aria-label="沉浸式主页入口">
+  <a class="immersive-gateway__link" href="{{ '/system/' | relative_url }}">
+    <span class="immersive-gateway__signal" aria-hidden="true"><i></i></span>
+    <span class="immersive-gateway__copy">
+      <span class="immersive-gateway__meta">IMMERSIVE MODE</span>
+      <span class="immersive-gateway__title">进入沉浸式主页</span>
+    </span>
+    <span class="immersive-gateway__detail">WEBGL / REALTIME</span>
+    <span class="immersive-gateway__arrow" aria-hidden="true"><i class="fas fa-arrow-right"></i></span>
+  </a>
+</section>
+
 <section class="writing-section" aria-label="文章列表">
   <div id="post-list" class="flex-grow-1">
     {% for post in posts %}

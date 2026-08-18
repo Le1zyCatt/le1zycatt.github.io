@@ -1,0 +1,55 @@
+- id: mooncake
+  title: MOONCAKE
+  subtitle: Distributed KV Cache / Transport
+  description: A public fork used for open-source systems work around disaggregated LLM serving and high-performance data movement.
+  tags:
+    - C++
+    - RDMA
+    - KV CACHE
+    - AI INFRA
+  github: https://github.com/Le1zyCatt/Mooncake
+  article:
+  status: OPEN SOURCE
+  visual: flow
+
+- id: agent-penguin
+  title: AGENT PENGUIN
+  subtitle: Personal Message Intelligence
+  description: A local-first agent for message and file summaries, retrieval, and replies written in a personal style.
+  tags:
+    - PYTHON
+    - RAG
+    - LANGCHAIN
+    - NCATBOT
+  github: https://github.com/Le1zyCatt/Agent-Penguin
+  article: /posts/tencent1/
+  status: BUILDING
+  visual: topology
+
+- id: manga-translate
+  title: MANGA TRANSLATE
+  subtitle: Modular OCR Translation Pipeline
+  description: A modular service that detects text locally, translates it, removes source copy, and typesets the result.
+  tags:
+    - PADDLEOCR
+    - OPENCV
+    - PYTHON
+    - PIPELINE
+  github: https://github.com/Le1zyCatt/manga_translate
+  article: /posts/manga/
+  status: RELEASED
+  visual: tensor
+
+- id: paper-system
+  title: PAPER SYSTEM
+  subtitle: Concurrent Peer Review Infrastructure
+  description: A C++ client-server review system with a custom file system, TCP protocol, role permissions, snapshots, and concurrent access.
+  tags:
+    - C++
+    - TCP
+    - FILE SYSTEM
+    - RBAC
+  github: https://github.com/Le1zyCatt/OS
+  article:
+  status: ARCHIVE
+  visual: packet

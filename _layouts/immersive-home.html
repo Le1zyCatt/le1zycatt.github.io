@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="{{ site.lang | default: 'en' }}">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#05070a">
+    <meta name="color-scheme" content="dark">
+    <meta name="description" content="{{ site.description | strip | escape }}">
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="Le1zy_Catt — AI Systems / Open Source">
+    <meta property="og:description" content="Building systems for intelligence.">
+    <meta property="og:url" content="{{ page.url | absolute_url }}">
+    <meta property="og:image" content="{{ '/assets/home/og.png' | absolute_url }}">
+    <meta property="og:image:width" content="1733">
+    <meta property="og:image:height" content="907">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:image" content="{{ '/assets/home/og.png' | absolute_url }}">
+    <link rel="canonical" href="{{ page.url | absolute_url }}">
+    <link rel="icon" href="{{ '/assets/img/favicons/favicon.ico' | relative_url }}" sizes="any">
+    <link rel="apple-touch-icon" href="{{ '/assets/img/favicons/apple-touch-icon.png' | relative_url }}">
+    <link rel="stylesheet" href="{{ '/assets/home/dist/home.css' | relative_url }}">
+    <title>Le1zy_Catt — Building Systems for Intelligence</title>
+  </head>
+  <body class="immersive-home">
+    <a class="skip-link" href="#selected-systems">Skip to selected systems</a>
+
+    <div class="boot" data-boot aria-hidden="true">
+      <div class="boot__signal boot__signal--a">0010110 / NODE_04 / RX</div>
+      <div class="boot__signal boot__signal--b">0x04F1 · SYNC</div>
+      <div class="boot__rail"><span></span></div>
+      <div class="boot__sequence" data-boot-sequence>
+        <p>LE1ZY SYSTEM</p>
+        <p>INITIALIZING INTERFACE</p>
+        <p>SYNCING NODES</p>
+        <p class="boot__ready">READY</p>
+      </div>
+    </div>
+
+    <div class="system-canvas" aria-hidden="true">
+      <canvas id="compute-core"></canvas>
+      <div class="canvas-fallback"></div>
+    </div>
+    <div class="noise" aria-hidden="true"></div>
+
+    <header class="system-nav" data-system-nav>
+      <a class="system-nav__mark" href="#hero" aria-label="Le1zy_Catt, back to top">
+        <span class="system-nav__pulse"></span>
+        LC / SYS
+      </a>
+      <nav aria-label="Primary navigation">
+        <a href="#system-map">INDEX</a>
+        <a href="{{ '/' | relative_url }}">BLOG</a>
+        <a href="https://github.com/Le1zyCatt" target="_blank" rel="noreferrer">GITHUB</a>
+        <button type="button" data-terminal-open aria-label="Open command terminal">&gt;_</button>
+      </nav>
+    </header>
+
+    <aside class="scene-index" aria-label="Current scene">
+      <span data-scene-current>01</span>
+      <i></i>
+      <span>06</span>
+    </aside>
+
+    <main>
+      <section id="hero" class="scene hero" data-scene="01">
+        <div class="hero__content">
+          <div class="eyebrow scramble-target" data-scramble="IDENTITY / COMPUTE / SIGNAL">IDENTITY / COMPUTE / SIGNAL</div>
+          <h1 aria-label="Le1zy Catt">
+            <span>LE1ZY</span><span>_CATT</span>
+          </h1>
+          <p class="hero__statement">BUILDING SYSTEMS<br>FOR INTELLIGENCE.</p>
+          <p class="hero__domain">AI SYSTEMS / DISTRIBUTED INFRA / OPEN SOURCE</p>
+        </div>
+
+        <dl class="system-status" aria-label="System status">
+          <div><dt>STATUS</dt><dd><span></span>ONLINE</dd></div>
+          <div><dt>LOCATION</dt><dd>EARTH</dd></div>
+          <div><dt>MODE</dt><dd>BUILD</dd></div>
+        </dl>
+
+        <div class="core-caption" aria-hidden="true">
+          <span>COMPUTE_CORE</span>
+          <span>FIELD / ACTIVE</span>
+        </div>
+        <a class="scroll-cue" href="#system-map">
+          <span>ENTER SYSTEM</span>
+          <i></i>
+        </a>
+      </section>
+
+      <section id="system-map" class="scene map" data-scene="02">
+        <div class="scene-heading">
+          <span class="eyebrow">02 / LIVE TOPOLOGY</span>
+          <h2 data-kinetic>SYSTEM<br>MAP</h2>
+          <p>The core decomposes into connected fields. Select a subsystem to reroute the interface.</p>
+        </div>
+
+        <div class="map__nodes" aria-label="System map navigation">
+          <button class="map-node map-node--ai" type="button" data-network-node="0" data-target="#selected-systems">
+            <span>NODE_01</span>AI
+          </button>
+          <button class="map-node map-node--systems" type="button" data-network-node="1" data-target="#selected-systems">
+            <span>NODE_02</span>SYSTEMS
+          </button>
+          <button class="map-node map-node--open" type="button" data-network-node="2" data-target="#selected-systems">
+            <span>NODE_03</span>OPEN SOURCE
+          </button>
+          <button class="map-node map-node--signals" type="button" data-network-node="3" data-target="#signal-archive">
+            <span>NODE_04</span>SIGNALS
+          </button>
+        </div>
+
+        <div class="map__telemetry" aria-hidden="true">
+          <span>TX 64.2 GB/S</span><span>ROUTE / ADAPTIVE</span><span>SYNC 04:01</span>
+        </div>
+      </section>
+
+      <section id="selected-systems" class="scene projects" data-scene="03">
+        <div class="section-intro">
+          <span class="eyebrow">03 / OUTPUT</span>
+          <h2 data-kinetic>SELECTED<br>SYSTEMS</h2>
+          <p>Public builds, experiments, and open-source systems.</p>
+        </div>
+
+        <div class="project-list">
+          {% for project in site.data.projects %}
+            <article class="project" id="project-{{ project.id }}" data-project="{{ project.id }}">
+              <div class="project__index">0{{ forloop.index }}</div>
+              <div class="project__copy">
+                <div class="project__meta">
+                  <span>MODULE / {{ project.status }}</span>
+                  <span>0{{ forloop.index }}—0{{ site.data.projects.size }}</span>
+                </div>
+                <h3>{{ project.title }}</h3>
+                <p class="project__subtitle">{{ project.subtitle }}</p>
+                <p class="project__description">{{ project.description }}</p>
+                <ul class="project__tags" aria-label="Technologies">
+                  {% for tag in project.tags %}<li>{{ tag }}</li>{% endfor %}
+                </ul>
+                <div class="project__links">
+                  <a href="{{ project.github }}" target="_blank" rel="noreferrer">SOURCE <span>↗</span></a>
+                  {% if project.article %}<a href="{{ project.article | relative_url }}">READ SIGNAL <span>→</span></a>{% endif %}
+                </div>
+              </div>
+              <div class="project__visual" aria-hidden="true">
+                <canvas data-module-visual="{{ project.visual }}"></canvas>
+                <span>LIVE / {{ project.visual | upcase }}</span>
+              </div>
+            </article>
+          {% endfor %}
+        </div>
+      </section>
+
+      <section id="trajectory" class="scene trajectory" data-scene="04">
+        <div class="section-intro">
+          <span class="eyebrow">04 / CHANGESET</span>
+          <h2 data-kinetic>BUILD<br>LOG</h2>
+        </div>
+
+        <div class="build-log">
+          <article class="build-entry">
+            <time datetime="2025">2025</time>
+            <div>
+              <span>COMMIT / 01</span>
+              <p>&gt; DEEP LEARNING SYSTEMS</p>
+              <p>&gt; LOCAL LLM DEPLOYMENT</p>
+              <p>&gt; APPLIED CRYPTOGRAPHY</p>
+            </div>
+          </article>
+          <article class="build-entry">
+            <time datetime="2026">2026</time>
+            <div>
+              <span>COMMIT / HEAD</span>
+              <p>&gt; MULTIMODAL FINETUNING</p>
+              <p>&gt; OCR TRANSLATION PIPELINES</p>
+              <p>&gt; DISTRIBUTED AI INFRASTRUCTURE</p>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section id="signal-archive" class="scene archive" data-scene="05">
+        <div class="section-intro archive__intro">
+          <span class="eyebrow">05 / KNOWLEDGE LAYER</span>
+          <h2 data-kinetic>SIGNAL<br>ARCHIVE</h2>
+          <p>Notes / Experiments / Logs</p>
+        </div>
+
+        <div class="signal-list">
+          {% for post in site.posts limit: 6 %}
+            <a class="signal" href="{{ post.url | relative_url }}">
+              <time datetime="{{ post.date | date_to_xmlschema }}">{{ post.date | date: '%Y.%m.%d' }}</time>
+              <div class="signal__copy">
+                <h3>{{ post.title }}</h3>
+                <p>{{ post.description | default: post.excerpt | strip_html | strip_newlines | truncate: 110 | escape }}</p>
+              </div>
+              <span class="signal__tag">
+                {% if post.tags.size > 0 %}{{ post.tags | first }}{% elsif post.categories.size > 0 %}{{ post.categories | first }}{% else %}LOG{% endif %}
+              </span>
+              <span class="signal__open">OPEN SIGNAL&nbsp; →</span>
+            </a>
+          {% endfor %}
+        </div>
+        <a class="archive__all" href="{{ '/archives/' | relative_url }}">QUERY ALL SIGNALS <span>→</span></a>
+      </section>
+
+      <section id="open-channel" class="scene channel" data-scene="06">
+        <div class="channel__signal" aria-hidden="true">01001100 01000011 / CHANNEL_OPEN</div>
+        <span class="eyebrow">06 / INTERFACE READY</span>
+        <h2>LET'S BUILD<br><em>WHAT'S NEXT.</em></h2>
+        <p>Use the command line or follow the public signal.</p>
+        <div class="channel__actions">
+          <button type="button" data-terminal-open>OPEN TERMINAL <span>&gt;_</span></button>
+          <a href="https://github.com/Le1zyCatt" target="_blank" rel="noreferrer">GITHUB <span>↗</span></a>
+        </div>
+        <footer>
+          <span>LE1ZY_CATT / SYSTEM ONLINE</span>
+          <span>© {{ 'now' | date: '%Y' }}</span>
+        </footer>
+      </section>
+    </main>
+
+    <button class="terminal-fab" type="button" data-terminal-open aria-label="Open command terminal">
+      <span>&gt;_</span><i></i>
+    </button>
+
+    <div class="terminal-backdrop" data-terminal-backdrop hidden></div>
+    <section class="terminal" data-terminal role="dialog" aria-modal="true" aria-labelledby="terminal-title" hidden>
+      <header>
+        <div>
+          <span class="terminal__status"></span>
+          <h2 id="terminal-title">COMMAND INTERFACE</h2>
+        </div>
+        <button type="button" data-terminal-close aria-label="Close terminal">ESC / CLOSE</button>
+      </header>
+      <div class="terminal__body" data-terminal-output aria-live="polite">
+        <p><span>SYSTEM</span> Secondary navigation interface ready.</p>
+        <p><span>HINT</span> Type <b>help</b> or select a command.</p>
+      </div>
+      <form class="terminal__form" data-terminal-form autocomplete="off">
+        <label for="terminal-input">le1zy@system:~$</label>
+        <input id="terminal-input" data-terminal-input type="text" inputmode="text" spellcheck="false" aria-label="Terminal command">
+        <span class="terminal__caret" aria-hidden="true"></span>
+      </form>
+      <div class="terminal__suggestions" aria-label="Command suggestions">
+        {% assign commands = 'help,about,projects,blog,github,contact,clear' | split: ',' %}
+        {% for command in commands %}<button type="button" data-command="{{ command }}">{{ command }}</button>{% endfor %}
+      </div>
+    </section>
+
+    <noscript>
+      <style>.boot{display:none!important}.system-canvas{opacity:.35}</style>
+      <div class="noscript">JavaScript is disabled. Core navigation and all public content remain available below.</div>
+    </noscript>
+
+    <script type="module" src="{{ '/assets/home/dist/home.js' | relative_url }}"></script>
+  </body>
+</html>

@@ -8,6 +8,12 @@
 
 set -eu
 
+# Prefer Homebrew Ruby on Apple Silicon. macOS system Ruby is too old for the
+# Bundler version locked by this project.
+if [[ -x /opt/homebrew/opt/ruby/bin/ruby ]]; then
+  export PATH="/opt/homebrew/opt/ruby/bin:$PATH"
+fi
+
 SITE_DIR="_site"
 
 _config="_config.yml"
@@ -49,6 +55,9 @@ read_baseurl() {
 }
 
 main() {
+  # build the immersive homepage assets
+  npm run build
+
   # clean up
   if [[ -d $SITE_DIR ]]; then
     rm -rf "$SITE_DIR"
