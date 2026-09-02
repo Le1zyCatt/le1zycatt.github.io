@@ -1,0 +1,2101 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Mooncake 技术工作总结 · 架构与关键优化</title>
+<meta name="description" content="Mooncake 项目技术复盘：从 UB 的 TENT-native 化、连接预热与可靠删除，到 HotCache 一致性、RDMA 数据路径和 SSD 调度优化。" />
+<meta name="theme-color" content="#070d14" />
+<style>
+:root{
+  --bg:#070d14;
+  --bg2:#0a121d;
+  --panel:#0f1927;
+  --panel2:#142235;
+  --text:#f3f7fb;
+  --muted:#a5b3c4;
+  --line:#273b52;
+  --blue:#78b7ff;
+  --green:#54d6ad;
+  --red:#ff7676;
+  --amber:#ffc66d;
+  --purple:#bd9bff;
+  --cyan:#65ddea;
+  --shadow:0 22px 60px rgba(0,0,0,.28);
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;background:var(--bg)}
+body{
+  margin:0;
+  color:var(--text);
+  background:
+    radial-gradient(circle at 8% -4%,rgba(120,183,255,.15),transparent 34rem),
+    radial-gradient(circle at 94% 8%,rgba(84,214,173,.09),transparent 30rem),
+    linear-gradient(180deg,var(--bg),#09131f 56%,#070d14);
+  font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+  line-height:1.65;
+}
+a{color:inherit;text-decoration:none}
+button{font:inherit}
+.skip-link{position:fixed;top:10px;left:10px;z-index:200;transform:translateY(-160%);padding:9px 12px;border-radius:9px;background:#fff;color:#07101d;font-weight:800;box-shadow:var(--shadow)}
+.skip-link:focus{transform:translateY(0)}
+.btn:focus-visible,.nav a:focus-visible,.skip-link:focus-visible{outline:3px solid rgba(120,183,255,.75);outline-offset:3px}
+.progress{position:fixed;top:0;left:0;width:0;height:3px;background:linear-gradient(90deg,var(--blue),var(--green));z-index:100}
+.shell{display:grid;grid-template-columns:286px minmax(0,1fr);max-width:1650px;margin:auto}
+.sidebar{
+  position:sticky;top:0;height:100vh;padding:26px 18px;border-right:1px solid var(--line);
+  background:rgba(7,16,29,.82);backdrop-filter:blur(16px);z-index:20
+}
+.brand{font-size:18px;font-weight:800;letter-spacing:.01em;margin:4px 8px 24px;display:flex;gap:11px;align-items:flex-start}
+.brand-mark{display:grid;place-items:center;flex:0 0 auto;width:34px;height:34px;border-radius:11px;background:linear-gradient(145deg,rgba(120,183,255,.26),rgba(84,214,173,.13));border:1px solid #315277;color:#dcecff;box-shadow:inset 0 1px rgba(255,255,255,.08)}
+.brand-copy{min-width:0}
+.brand small{display:block;color:var(--muted);font-weight:500;margin-top:4px;font-size:12px}
+.nav{display:flex;flex-direction:column;gap:5px}
+.nav a{
+  padding:10px 12px;border-radius:10px;color:#bfd0e7;font-size:14px;border:1px solid transparent
+}
+.nav a:hover,.nav a.active{background:linear-gradient(90deg,#11243d,#102036);border-color:#315275;color:#fff}
+.legend{
+  margin:22px 8px 0;padding-top:18px;border-top:1px solid var(--line);
+  color:var(--muted);font-size:12px
+}
+.legend span{display:flex;gap:8px;align-items:center;margin:8px 0}
+.dot{width:10px;height:10px;border-radius:50%;display:inline-block}
+.main{min-width:0}
+.hero{
+  min-height:min(900px,92vh);display:flex;align-items:center;padding:76px clamp(28px,6vw,100px);
+  border-bottom:1px solid var(--line);position:relative;overflow:hidden
+}
+.hero:after{
+  content:"";position:absolute;right:-130px;bottom:-180px;width:520px;height:520px;border-radius:50%;
+  border:1px solid rgba(90,167,255,.14);box-shadow:0 0 0 70px rgba(90,167,255,.02),0 0 0 140px rgba(90,167,255,.018)
+}
+.kicker{display:inline-flex;align-items:center;gap:8px;padding:7px 10px;border:1px solid rgba(84,214,173,.26);border-radius:999px;background:rgba(84,214,173,.07);font-size:12px;letter-spacing:.15em;text-transform:uppercase;color:#91e8ce;font-weight:800}
+.kicker:before{content:"";width:6px;height:6px;border-radius:50%;background:var(--green);box-shadow:0 0 14px rgba(84,214,173,.9)}
+h1{font-size:clamp(38px,5.4vw,76px);line-height:1.06;margin:14px 0 22px;max-width:1000px;letter-spacing:-.035em}
+.hero p{max-width:930px;color:var(--muted);font-size:clamp(16px,1.6vw,21px)}
+.hero-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:34px;max-width:1050px}
+.hero-card{
+  padding:18px;border:1px solid var(--line);border-radius:16px;background:linear-gradient(160deg,rgba(20,34,53,.9),rgba(12,24,38,.8));
+  box-shadow:var(--shadow)
+}
+.hero-card b{display:block;font-size:22px;margin-bottom:4px}
+.hero-card span{color:var(--muted);font-size:13px}
+.hero-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:24px}
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;border:1px solid #3b6189;background:#132740;color:white;border-radius:10px;padding:9px 13px;cursor:pointer
+}
+.btn:hover{background:#173052}
+.section{padding:68px clamp(28px,5vw,82px);border-bottom:1px solid rgba(38,58,86,.75)}
+.section:nth-child(even){background:rgba(12,24,40,.36)}
+.section-head{display:grid;grid-template-columns:110px minmax(0,1fr);gap:24px;align-items:start;margin-bottom:32px}
+.num{
+  font-size:54px;font-weight:900;line-height:1;color:rgba(90,167,255,.28);letter-spacing:-.05em
+}
+h2{font-size:clamp(30px,3.2vw,48px);line-height:1.15;margin:0 0 12px;letter-spacing:-.025em}
+.lead{font-size:17px;color:var(--muted);max-width:1000px}
+.badge-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+.badge{
+  display:inline-flex;padding:5px 9px;border-radius:999px;border:1px solid var(--line);font-size:12px;color:#c7d6e8;background:#0d1a2b
+}
+.badge.green{border-color:#2e7650;color:#a8f0c7;background:#0c2418}
+.badge.red{border-color:#763838;color:#ffc0c0;background:#2c1111}
+.badge.amber{border-color:#765a22;color:#ffe0a4;background:#2b210d}
+.badge.blue{border-color:#315c8b;color:#acd2ff;background:#0e2035}
+.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
+.grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px}
+.card{
+  background:linear-gradient(180deg,rgba(19,35,58,.92),rgba(13,27,45,.92));
+  border:1px solid var(--line);border-radius:18px;padding:22px;box-shadow:var(--shadow);min-width:0
+}
+.card,.flowbox,.ov,.hero-card{transition:border-color .2s ease,transform .2s ease,background-color .2s ease}
+.card:hover,.flowbox:hover,.ov:hover,.hero-card:hover{border-color:#3b5877;transform:translateY(-2px)}
+.card h3{margin:0 0 10px;font-size:19px}
+.card p,.card li{color:#bdcce0}
+.card ul{padding-left:20px;margin:10px 0 0}
+.callout{
+  margin:20px 0;padding:18px 20px;border-left:4px solid var(--blue);background:#0d1d31;border-radius:12px;
+  color:#dbe8f8
+}
+.callout.green{border-color:var(--green);background:#0d2119}
+.callout.red{border-color:var(--red);background:#261315}
+.callout.amber{border-color:var(--amber);background:#261e0e}
+.callout strong{color:white}
+.diagram{
+  margin:22px 0;border:1px solid var(--line);border-radius:18px;background:#f8fbff;overflow:auto;box-shadow:var(--shadow)
+}
+.diagram-title{
+  color:#d7e4f7;background:#0d1a2b;border-bottom:1px solid var(--line);padding:12px 16px;font-size:13px;font-weight:700;
+  position:sticky;left:0
+}
+.mermaid{padding:22px;min-width:0;display:flex;justify-content:center;align-items:center}
+.mermaid svg{display:block;max-width:100%!important;height:auto!important}
+.diagram.arch .mermaid svg{max-height:620px;width:auto!important}
+.diagram.arch .mermaid{overflow:hidden}
+.compare-title{font-size:13px;font-weight:800;color:var(--amber);letter-spacing:.08em;text-transform:uppercase;margin-bottom:8px}
+.arrowline{
+  display:grid;grid-template-columns:1fr 46px 1fr;gap:14px;align-items:stretch;margin:22px 0
+}
+.arrowmid{display:flex;align-items:center;justify-content:center;color:var(--green);font-size:28px;font-weight:900}
+.flowbox{
+  border:1px solid var(--line);border-radius:14px;padding:16px;background:#0c192a;color:#c7d6e8
+}
+.flowbox strong{display:block;color:white;margin-bottom:8px}
+.flowline{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:13px;white-space:pre-wrap}
+.table-wrap{overflow:auto;border:1px solid var(--line);border-radius:14px;margin-top:18px}
+table{border-collapse:collapse;width:100%;min-width:720px;background:#0c192a}
+th,td{text-align:left;padding:12px 14px;border-bottom:1px solid #243951;vertical-align:top}
+th{color:#dce9fb;background:#102039;font-size:13px}
+td{color:#b9c9dc;font-size:13px}
+td strong{color:#fff}
+.small{font-size:12px;color:var(--muted)}
+code{
+  font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  color:#d8eaff;background:#0a1727;border:1px solid #27405d;border-radius:5px;padding:1px 5px
+}
+.codebox{
+  margin:12px 0 0;padding:15px 16px;border:1px solid var(--line);border-radius:12px;
+  background:#081525;color:#c9d9eb;overflow:auto;
+  font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;line-height:1.7;white-space:pre-wrap
+}
+.rule{
+  display:grid;grid-template-columns:160px minmax(0,1fr);gap:16px;padding:12px 0;border-bottom:1px solid #243951
+}
+.rule:last-child{border-bottom:0}
+.rule b{color:#fff}.rule span{color:#bdcce0;font-size:13px}
+.status-ok{color:#9ce9bb;font-weight:700}
+.status-skip{color:#ffd68a;font-weight:700}
+.status-check{color:#acd2ff;font-weight:700}
+@media(max-width:720px){.rule{grid-template-columns:1fr;gap:4px}}
+
+.footer{padding:44px clamp(28px,5vw,82px) 70px;color:var(--muted);font-size:13px}
+.overview-line{
+  display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-top:28px
+}
+.ov{
+  position:relative;padding:16px 12px 14px;border:1px solid var(--line);border-radius:13px;background:#0d1b2d;min-height:120px
+}
+.ov b{display:block;font-size:13px;color:white;margin-bottom:6px}.ov span{font-size:12px;color:var(--muted)}
+.ov:before{content:"";position:absolute;top:0;left:12px;right:12px;height:3px;border-radius:3px;background:var(--blue)}
+.ov:nth-child(2):before{background:var(--green)}.ov:nth-child(3):before{background:var(--amber)}
+.ov:nth-child(4):before{background:var(--red)}.ov:nth-child(5):before{background:var(--purple)}.ov:nth-child(6):before{background:var(--cyan)}
+@media(max-width:1050px){
+  .shell{grid-template-columns:1fr}.sidebar{display:none}
+  .hero-grid,.grid3{grid-template-columns:1fr 1fr}.overview-line{grid-template-columns:repeat(3,1fr)}
+}
+@media(max-width:720px){
+  .hero{min-height:auto;padding-top:56px}.hero-grid,.grid2,.grid3{grid-template-columns:1fr}
+  .section-head{grid-template-columns:1fr}.num{font-size:38px}
+  .overview-line{grid-template-columns:1fr 1fr}.arrowline{grid-template-columns:1fr}.arrowmid{transform:rotate(90deg)}
+}
+@media print{
+  body{background:white;color:#111}.sidebar,.progress,.hero-actions{display:none}.shell{display:block}.section,.hero{break-inside:avoid;page-break-inside:avoid}
+  .card,.diagram,.flowbox{box-shadow:none}.diagram{border-color:#ddd}.hero,.section{border-color:#ddd}
+}
+.presentation .section{min-height:100vh;display:flex;flex-direction:column;justify-content:center}
+.presentation .hero{min-height:100vh}
+
+/* Editorial polish for embedded reading and smaller screens. */
+.embedded .hero{min-height:78vh}
+.embedded .hero:after{opacity:.7}
+noscript{display:block;margin:18px;padding:12px 14px;border:1px solid #745825;border-radius:10px;background:#2b210d;color:#ffe0a4}
+@media(max-width:1100px){
+  .shell{grid-template-columns:1fr}
+  .sidebar{display:grid;grid-template-columns:auto minmax(0,1fr);align-items:center;gap:14px;position:sticky;top:0;height:auto;padding:10px 16px;border-right:0;border-bottom:1px solid var(--line);background:rgba(7,13,20,.9)}
+  .brand{margin:0;align-items:center}.brand-mark{width:30px;height:30px}.brand small,.legend{display:none}
+  .nav{min-width:0;flex-direction:row;overflow-x:auto;overscroll-behavior-inline:contain;scrollbar-width:none}
+  .nav::-webkit-scrollbar{display:none}.nav a{flex:0 0 auto;white-space:nowrap;padding:8px 10px}
+  .hero-grid,.grid3{grid-template-columns:1fr 1fr}.overview-line{grid-template-columns:repeat(3,1fr)}
+}
+@media(max-width:720px){
+  .sidebar{grid-template-columns:1fr;padding:8px 10px}.brand{display:none}
+  .hero{padding:50px 22px 42px}.section{padding:52px 20px}.footer{padding:38px 20px 56px}
+  h1{font-size:clamp(36px,12vw,54px)}.hero p{font-size:16px}
+}
+@media(prefers-reduced-motion:reduce){
+  html{scroll-behavior:auto}.card,.flowbox,.ov,.hero-card{transition:none}.card:hover,.flowbox:hover,.ov:hover,.hero-card:hover{transform:none}
+}
+@media print{
+  .sidebar,.progress,.hero-actions,.skip-link,body>noscript{display:none!important}
+  .shell{display:block}.hero{min-height:auto}
+}
+</style>
+</head>
+<body>
+<a class="skip-link" href="#main-content">跳到正文</a>
+<div class="progress" id="progress"></div>
+<div class="shell">
+  <aside class="sidebar" aria-label="报告导航">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true">M</span>
+      <span class="brand-copy">Mooncake 技术总结
+        <small>架构 · 数据路径 · 可靠性 · 性能</small>
+      </span>
+    </div>
+    <nav class="nav" id="nav" aria-label="章节导航">
+      <a href="#overview">总览</a>
+      <a href="#overall">00 · Mooncake 总体架构</a>
+      <a href="#ub">01 · UB → TENT</a>
+      <a href="#warmup">02 · Warmup 预建链</a>
+      <a href="#bucket">03 · Bucket 删除 & GC</a>
+      <a href="#hotcache">04 · HotCache 修复</a>
+      <a href="#rdma">05 · RDMA 少一跳</a>
+      <a href="#ssd">06 · SSD 负载均衡</a>
+      <a href="#community">07 · 社区协作流程</a>
+    </nav>
+    <div class="legend">
+      <span><i class="dot" style="background:var(--green)"></i> 新增 / 优化路径</span>
+      <span><i class="dot" style="background:var(--red)"></i> 原问题 / 冗余路径</span>
+      <span><i class="dot" style="background:var(--blue)"></i> 已有基础能力</span>
+      <span><i class="dot" style="background:var(--amber)"></i> 关键控制 / 可靠性机制</span>
+    </div>
+  </aside>
+
+  <main class="main" id="main-content">
+    <header class="hero" id="overview">
+      <div>
+        <div class="kicker">Open-source systems · Technical review</div>
+        <h1>从“能工作”到“可扩展、可靠、高性能”的系统演进</h1>
+        <p>
+          本页基于 Mooncake 项目历史讨论整理。重点不是罗列提交，而是解释每项工作的系统问题、
+          数据路径变化和架构价值：UB 的 TENT-native 化、连接预热、LOCAL_DISK 可靠删除、
+          HotCache 一致性修复、RDMA 数据路径缩短，以及 SSD 分配的反馈式负载均衡。
+        </p>
+        <div class="hero-grid">
+          <div class="hero-card"><b>6 + 1</b><span>6 条技术主线 + 1 套社区协作闭环</span></div>
+          <div class="hero-card"><b>4 类</b><span>性能 / 可靠性 / 架构 / 资源调度</span></div>
+          <div class="hero-card"><b>1 条主线</b><span>减少耦合、前移成本、闭合反馈、保证最终一致</span></div>
+        </div>
+        <div class="hero-actions">
+          <button class="btn" type="button" onclick="document.body.classList.toggle('presentation')">切换演示模式</button>
+          <button class="btn" type="button" onclick="window.print()">打印 / 导出 PDF</button>
+          <a class="btn" href="/assets/mooncake/technical-review.html" target="_blank" rel="noopener">全屏阅读</a>
+        </div>
+
+        <div class="overview-line">
+          <div class="ov"><b>UB → TENT</b><span>Adapter 复用旧 TE → Native 数据面</span></div>
+          <div class="ov"><b>Warmup</b><span>业务首访建链 → 初始化阶段提前建链</span></div>
+          <div class="ov"><b>Bucket Delete</b><span>仅删 metadata → 可重试、可持久化、可 GC</span></div>
+          <div class="ov"><b>HotCache</b><span>单次失效 → 两阶段失效封闭并发窗口</span></div>
+          <div class="ov"><b>RDMA Direct</b><span>Requester Pull → Target Push</span></div>
+          <div class="ov"><b>SSD Balance</b><span>随机分配 → 基于容量反馈的选择</span></div>
+        </div>
+      </div>
+    </header>
+
+
+    <section class="section" id="overall">
+      <div class="section-head">
+        <div class="num">00</div>
+        <div>
+          <h2>Mooncake 总体架构：关键模块与本次修改落点</h2>
+          <div class="lead">
+            Mooncake 可以分成四层来理解：上层是应用与 Store API，中间是控制面与元数据，
+            下层是 Transfer Engine / TENT 数据搬运层，最底层是实际存储介质与网络硬件。
+            本次工作主要分布在 <strong>Store Client / Master 控制面</strong>、<strong>TENT / Transfer Engine 数据面</strong>、
+            <strong>LOCAL_DISK 存储管理</strong> 三个区域。
+          </div>
+          <div class="badge-row">
+            <span class="badge blue">基础模块</span>
+            <span class="badge green">本次修改直接落点</span>
+            <span class="badge amber">关键控制 / 调度节点</span>
+            <span class="badge red">原问题集中区域</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="diagram arch">
+        <div class="diagram-title">Mooncake 整体架构与本次工作分布</div>
+        <pre class="mermaid">
+flowchart TB
+  subgraph APP["应用与接入层"]
+    direction LR
+    A1["LLM / Inference Service"]
+    A2["Python Binding / Client SDK"]
+    A3["Mooncake Store Client API<br/>Put / Get / Remove / BatchGet"]
+    A1 --> A2 --> A3
+  end
+
+  subgraph CACHE["客户端缓存与访问路径"]
+    direction LR
+    HC["HotCache"]
+    DC["DummyClient / RealClient"]
+    WU["Warmup Manager"]
+    A3 --> HC
+    A3 --> DC
+    DC --> WU
+  end
+
+  subgraph CTRL["控制面 / 元数据面"]
+    direction TB
+    MC["MasterClient"]
+    WS["WrappedMasterService / MasterService"]
+    META["Object Metadata / Replica Metadata"]
+    ALLOC["Allocation Strategy<br/>SSD_FREE_RATIO_FIRST"]
+    RPC["ListWarmupTargets / Remove / FetchRemoveTasks / AckRemoveTasks"]
+    PLUGIN["Metadata Store Plugin<br/>etcd / P2P Handshake"]
+    MC --> WS
+    WS --> META
+    WS --> ALLOC
+    WS --> RPC
+    WS --> PLUGIN
+  end
+
+  subgraph TE["数据搬运层"]
+    direction LR
+    FAC["TransferEngine Facade"]
+    subgraph OLDTE["Classic Transfer Engine"]
+      direction TB
+      MT["MultiTransport"]
+      RDMA0["RdmaTransport"]
+      TCP0["TcpTransport"]
+      UB0["UbTransport"]
+      META0["TransferMetadata / Handshake"]
+      MT --> RDMA0
+      MT --> TCP0
+      MT --> UB0
+      UB0 --> META0
+    end
+
+    subgraph TENT["TENT Runtime"]
+      direction TB
+      TI["tent::TransferEngineImpl"]
+      TS["TransportSelector"]
+      TL["TransportLoader"]
+      SM["SegmentManager"]
+      PFM["Platform / Topology"]
+      TUB["UB Transport<br/>Non-native / Native"]
+      TRDMA["RdmaTransport"]
+      TTCP["TcpTransport"]
+      TI --> TS
+      TI --> TL
+      TI --> SM
+      TI --> PFM
+      TL --> TUB
+      TL --> TRDMA
+      TL --> TTCP
+    end
+
+    FAC --> OLDTE
+    FAC --> TENT
+  end
+
+  subgraph STORAGE["存储与后台任务"]
+    direction LR
+    MEM["Memory Segment / KV Buffer"]
+    FILE["FileStorage"]
+    BUCKET["BucketStorageBackend"]
+    GC["Bucket GC Worker"]
+    DFS["DFS / Remote Storage"]
+    FILE --> BUCKET --> GC
+  end
+
+  subgraph HW["网络与硬件"]
+    direction LR
+    RDMAH["RDMA NIC / verbs"]
+    UBH["UB NIC / URMA / liburma"]
+    TCPH["TCP Socket"]
+    SSD["LOCAL_DISK / SSD"]
+    DRAM["Host DRAM"]
+  end
+
+  HC --> FAC
+  DC --> MC
+  DC --> FAC
+  WU --> MC
+  WU --> FAC
+
+  META --> FAC
+  ALLOC --> FILE
+  RPC --> FILE
+
+  FAC --> MEM
+  FAC --> FILE
+  FAC --> DFS
+
+  RDMA0 --> RDMAH
+  TCP0 --> TCPH
+  UB0 --> UBH
+
+  TRDMA --> RDMAH
+  TTCP --> TCPH
+  TUB --> UBH
+
+  MEM --> DRAM
+  FILE --> SSD
+  BUCKET --> SSD
+
+  classDef core fill:#dfecff,stroke:#3973c6,stroke-width:2px,color:#123;
+  classDef mine fill:#ddf5e3,stroke:#32a852,stroke-width:3px,color:#132;
+  classDef key fill:#fff0cc,stroke:#e39a20,stroke-width:3px,color:#321;
+  classDef prob fill:#ffe1e1,stroke:#d64545,stroke-width:2px,color:#311;
+
+  class A1,A2,A3,MC,WS,META,PLUGIN,FAC,MT,RDMA0,TCP0,UB0,META0,TI,TS,TL,SM,PFM,TRDMA,TTCP,MEM,FILE,DFS,RDMAH,UBH,TCPH,SSD,DRAM core;
+  class HC,WU,ALLOC,RPC,TUB,BUCKET,GC mine;
+  class DC key;
+  class FILE,HC,RPC,ALLOC prob;
+        </pre>
+      </div>
+
+      <div class="callout green"><strong>本次修改的直接落点：</strong> 绿色模块表示我们这阶段直接改动或新增的部分：<code>HotCache</code>、<code>Warmup Manager</code>、<code>Allocation Strategy</code>、删除相关 RPC、TENT 中的 UB Transport、<code>BucketStorageBackend</code> 与 <code>Bucket GC Worker</code>。</div>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>工作项</th><th>主要落点</th><th>在总体架构中的位置</th><th>关联模块</th></tr></thead>
+          <tbody>
+            <tr>
+              <td><strong>UB 接入 TENT（Non-native / Native）</strong></td>
+              <td>TENT Runtime / UB Transport</td>
+              <td>数据搬运层</td>
+              <td><code>TransportSelector</code>、<code>TransportLoader</code>、<code>SegmentManager</code>、UB data plane</td>
+            </tr>
+            <tr>
+              <td><strong>Warmup 预建链</strong></td>
+              <td>Store Client + Master + TE handshake</td>
+              <td>客户端访问路径 + 控制面 + 数据搬运层</td>
+              <td><code>Client::warmup</code>、<code>MasterClient</code>、<code>ListWarmupTargets</code>、<code>openSegment</code></td>
+            </tr>
+            <tr>
+              <td><strong>Bucket 删除与 GC</strong></td>
+              <td>MasterService + FileStorage + BucketStorageBackend + GC</td>
+              <td>控制面 + 存储层</td>
+              <td><code>FetchRemoveTasks</code>、<code>AckRemoveTasks</code>、<code>MarkRemoved</code>、<code>BucketGcWorker</code></td>
+            </tr>
+            <tr>
+              <td><strong>HotCache 修复</strong></td>
+              <td>Store Client HotCache path</td>
+              <td>客户端缓存与访问路径</td>
+              <td><code>HotCache</code>、Get/Remove/Upsert 路径</td>
+            </tr>
+            <tr>
+              <td><strong>RDMA 少一跳优化</strong></td>
+              <td>Store 远端读流程 + RDMA transport 编排</td>
+              <td>数据搬运层 + 远端存储读取路径</td>
+              <td>Requester / Target staging / RDMA READ→WRITE 编排</td>
+            </tr>
+            <tr>
+              <td><strong>SSD 负载均衡</strong></td>
+              <td>Master allocation strategy</td>
+              <td>控制面 / 资源调度</td>
+              <td><code>SSD_FREE_RATIO_FIRST</code>、<code>ssd_used_bytes</code> accounting</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="diagram arch">
+        <div class="diagram-title">从请求视角看：一次典型访问会经过哪些层</div>
+        <pre class="mermaid">
+flowchart LR
+  REQ["应用发起 Put / Get / Remove"]
+    --> API["Store Client API"]
+    --> PATH{"操作类型"}
+
+  PATH -->|"Get / BatchGet"| HOT["HotCache / Metadata Lookup"]
+  PATH -->|"Put / Write"| PUT["Store metadata + allocate replica"]
+  PATH -->|"Remove"| DEL["Master Remove / Delete Task"]
+
+  HOT --> TE1["TransferEngine / TENT"]
+  PUT --> TE1
+  DEL --> CTRL1["Master / Holder / GC 协议"]
+
+  TE1 --> XPORT{"传输后端"}
+  XPORT --> RD["RDMA"]
+  XPORT --> UB["UB / URMA"]
+  XPORT --> TCP["TCP"]
+
+  RD --> DATA["远端 Memory / SSD / DFS 数据"]
+  UB --> DATA
+  TCP --> DATA
+
+  CTRL1 --> FILE1["LOCAL_DISK Holder / BucketStorageBackend"]
+  FILE1 --> GC1["GC 回收"]
+
+  classDef core fill:#dfecff,stroke:#3973c6,stroke-width:2px,color:#123;
+  classDef mine fill:#ddf5e3,stroke:#32a852,stroke-width:3px,color:#132;
+  classDef key fill:#fff0cc,stroke:#e39a20,stroke-width:3px,color:#321;
+
+  class REQ,API,PATH,TE1,XPORT,RD,UB,TCP,DATA core;
+  class HOT,DEL,CTRL1,FILE1,GC1,PUT mine;
+  class PUT,HOT key;
+        </pre>
+      </div>
+    </section>
+
+
+    <section class="section" id="ub">
+      <div class="section-head">
+        <div class="num">01</div>
+        <div>
+          <h2>UB 接入 TENT：从兼容层到 Native 数据面</h2>
+          <div class="lead">
+            第一阶段目标是低风险接入：TENT 能识别和选择 UB，但真正的数据面仍复用 Classic Transfer Engine。
+            下一阶段则消除中间模型转换，让 UB 成为真正的 TENT-native transport。
+          </div>
+          <div class="badge-row">
+            <span class="badge green">架构演进</span>
+            <span class="badge blue">复用 URMA</span>
+            <span class="badge amber">控制面 / 数据面解耦</span>
+            <span class="badge red">消除 Classic TE 依赖</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid2">
+        <div class="card">
+          <h3>非 Native 版本</h3>
+          <ul>
+            <li>TENT 负责 Transport 加载、选择、控制面和 UB bootstrap。</li>
+            <li><code>UbTentTransport</code> 将 TENT Request / Metadata 转换为 Classic TE 模型。</li>
+            <li>内存注册、切片、设备选择、Endpoint 与 URMA 数据面仍由 Classic <code>UbTransport</code> 执行。</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>Native 版本</h3>
+          <ul>
+            <li>TENT Request 直接生成 <code>UbTask / UbSlice</code>，不再转换成 Classic TransferRequest。</li>
+            <li><code>UbWorkers</code> 负责切片执行、路径选择、提交与完成处理。</li>
+            <li>通过 <code>UrmaAdapter</code> 直接对接 liburma，UB 数据面完整归入 TENT。</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="diagram arch">
+        <div class="diagram-title">非 Native：TENT 控制面 + Classic TE UB 数据面</div>
+        <pre class="mermaid">
+flowchart TB
+  APP["Application / Mooncake Store"]
+
+  subgraph TENT["TENT Layer"]
+    direction LR
+    RT["TENT Runtime"] --> SEL["Transport Selector"] -->|"选择 UB"| UBT["UbTentTransport"] --> BR["Request / Metadata Bridge"]
+  end
+
+  subgraph CLASSIC["Classic TE UB Data Plane"]
+    direction LR
+    OLD["Classic UbTransport"] --> CTX["UbContext / UbEndpoint"] --> W["UB Worker"]
+    OLD --> TOPO["Legacy Topology"]
+  end
+
+  subgraph URMA["URMA / UMDK"]
+    direction LR
+    UC["UrmaContext / UrmaEndpoint"] --> LIB["liburma"] --> HW["UB NIC"]
+  end
+
+  APP --> RT
+  BR -->|"TENT Request → TransferRequest"| OLD
+  W --> UC
+
+  classDef new fill:#ddf5e3,stroke:#32a852,stroke-width:3px,color:#132;
+  classDef bad fill:#ffe1e1,stroke:#d64545,stroke-width:3px,color:#311;
+  classDef core fill:#dfecff,stroke:#3973c6,stroke-width:2px,color:#123;
+  classDef key fill:#fff0cc,stroke:#e39a20,stroke-width:3px,color:#321;
+  class UBT new;
+  class BR key;
+  class OLD,TOPO bad;
+  class RT,SEL,CTX,W,UC,LIB,HW core;
+        </pre>
+      </div>
+
+      <div class="callout red"><strong>核心技术债：</strong> TENT 已经选择了 UB，但真正执行数据路径时仍“退回”旧 TE；因此接入成功 ≠ 架构完成。</div>
+      <div class="diagram arch">
+        <div class="diagram-title">核心类图：非 Native 版本如何把 TENT 翻译到 Classic TE</div>
+        <pre class="mermaid">
+classDiagram
+  direction LR
+
+  class Transport {
+    &lt;&lt;interface&gt;&gt;
+    +install()
+    +uninstall()
+    +allocateSubBatch()
+    +freeSubBatch()
+    +submitTransferTasks()
+    +getTransferStatus()
+    +addMemoryBuffer()
+    +removeMemoryBuffer()
+    +getEstimatedBandwidth()
+    +cancelTransferTask()
+  }
+
+  class UbTentTransport {
+    &lt;&lt;TENT adapter&gt;&gt;
+    -legacyUbTransport
+    -metadataBridge
+    +install()
+    +addMemoryBuffer()
+    +allocateSubBatch()
+    +submitTransferTasks()
+    +getTransferStatus()
+    +cancelTransferTask()
+  }
+
+  class UbTentMetadataBridge {
+    &lt;&lt;metadata adapter&gt;&gt;
+    +getSegmentDescByName()
+    +getSegmentDescByID()
+    +translateHandshake()
+  }
+
+  class TransferMetadata {
+    &lt;&lt;Classic TE interface&gt;&gt;
+    +SegmentDesc
+    +HandShakeDesc
+  }
+
+  class SegmentManager {
+    +BufferDesc
+    +SegmentDesc
+    +lookupSegment()
+  }
+
+  class ControlService {
+    +BootstrapUb()
+  }
+
+  class UbTransport {
+    &lt;&lt;Classic TE UbTransport&gt;&gt;
+    +install()
+    +registerLocalMemory()
+    +allocateBatchID()
+    +submitTransfer()
+    +getTransferStatus()
+  }
+
+  class BatchID {
+    &lt;&lt;Classic TE task handle&gt;&gt;
+  }
+
+  class TransferRequest {
+    +opcode
+    +source
+    +target
+    +length
+  }
+
+  class TransferTask {
+    +status
+    +transferredBytes
+  }
+
+  Transport &lt;|-- UbTentTransport
+  UbTentTransport --> UbTransport : delegates data path
+  UbTentTransport --> UbTentMetadataBridge : metadata / handshake
+  UbTentMetadataBridge ..|> TransferMetadata
+  UbTentMetadataBridge --> SegmentManager : TENT segment → legacy view
+  UbTentMetadataBridge --> ControlService : BootstrapUb
+  UbTransport --> TransferMetadata
+  UbTransport --> BatchID
+  UbTransport --> TransferRequest
+  UbTransport --> TransferTask
+        </pre>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>TENT 侧</th><th>适配层动作</th><th>Classic TE 侧</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Transport / SubBatch / Request</strong></td>
+              <td><code>UbTentTransport</code> 将 TENT 的提交与状态接口转换为旧 TE 的 batch/task 调用</td>
+              <td><code>BatchID / TransferRequest / TransferTask</code></td>
+            </tr>
+            <tr>
+              <td><strong>SegmentManager / BufferDesc</strong></td>
+              <td><code>UbTentMetadataBridge</code> 提供旧 <code>TransferMetadata</code> 所需的 segment 视图</td>
+              <td><code>TransferMetadata::SegmentDesc</code></td>
+            </tr>
+            <tr>
+              <td><strong>TENT ControlService</strong></td>
+              <td>通过 <code>BootstrapUb</code> 完成 UB 控制面握手并转换为旧握手描述</td>
+              <td><code>HandShakeDesc</code> / Endpoint 初始化信息</td>
+            </tr>
+            <tr>
+              <td><strong>addMemoryBuffer()</strong></td>
+              <td>调用旧 UB 注册本地内存，并把生成的 UB segment 信息回写到 TENT BufferDesc</td>
+              <td>URMA tseg / registered segment</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+
+      <div class="diagram">
+        <div class="diagram-title">非 Native 时序：请求经过适配，再进入 Classic TE</div>
+        <pre class="mermaid">
+sequenceDiagram
+  participant APP as Store / App
+  participant TENT as TENT Runtime
+  participant ADP as UbTentTransport
+  participant TE as Classic UbTransport
+  participant EP as UbEndpoint
+  participant URMA as liburma / NIC
+
+  APP->>TENT: submit(Request)
+  TENT->>TENT: TransportSelector 选择 UB
+  rect rgb(221,245,227)
+    TENT->>ADP: TENT Request
+  end
+  rect rgb(255,240,204)
+    ADP->>ADP: Request → TransferRequest
+    ADP->>TE: submitTransfer()
+  end
+  rect rgb(255,225,225)
+    TE->>TE: Classic topology / slice / batch
+    TE->>EP: 获取或建立 Endpoint
+  end
+  EP->>URMA: post READ / WRITE
+  URMA-->>EP: CQE
+  EP-->>TE: complete
+  TE-->>ADP: Classic status
+  ADP-->>TENT: TENT status
+  TENT-->>APP: Complete
+        </pre>
+      </div>
+
+      <div class="arrowline">
+        <div class="flowbox">
+          <strong>非 Native</strong>
+          <div class="flowline">TENT Request
+↓
+UbTentTransport
+↓
+🟠 Request / Metadata Bridge
+↓
+🔴 Classic TransferRequest
+↓
+🔴 Classic UbTransport
+↓
+URMA</div>
+        </div>
+        <div class="arrowmid">→</div>
+        <div class="flowbox">
+          <strong>Native</strong>
+          <div class="flowline">TENT Request
+↓
+🟢 UbTask
+↓
+🟢 UbSlice
+↓
+🟢 UbWorkers
+↓
+UrmaAdapter
+↓
+URMA</div>
+        </div>
+      </div>
+
+      <div class="diagram arch">
+        <div class="diagram-title">Native：TENT-native UB 数据面</div>
+        <pre class="mermaid">
+flowchart TB
+  APP["Application / Store"]
+
+  subgraph TENT["TENT Runtime"]
+    direction LR
+    RT["TENT Runtime"] --> SEL["Transport Selector"] --> UB["Native UB Transport"]
+  end
+
+  subgraph EXEC["TENT-native UB Execution"]
+    direction LR
+    TASK["UbTask"] --> SL["UbSlice[]"] --> W["UbWorkers"] --> PATH["Path / Rail Selection"]
+  end
+
+  subgraph DATA["UB Data Plane"]
+    direction LR
+    CTX["UbContext"] --> EP["UbEndpoint"] --> UA["UrmaAdapter"]
+  end
+
+  subgraph UMDK["URMA / UMDK"]
+    direction LR
+    LIB["liburma"] --> HW["UB NIC"] --> JFC["UbJfc / Completion"]
+  end
+
+  APP --> RT
+  UB --> TASK
+  PATH --> CTX
+  UA --> LIB
+  JFC --> W
+  W --> TASK
+
+  classDef new fill:#ddf5e3,stroke:#32a852,stroke-width:3px,color:#132;
+  classDef key fill:#fff0cc,stroke:#e39a20,stroke-width:3px,color:#321;
+  classDef core fill:#dfecff,stroke:#3973c6,stroke-width:2px,color:#123;
+  class UB,TASK,SL,W new;
+  class PATH key;
+  class RT,SEL,CTX,EP,UA,LIB,HW,JFC core;
+        </pre>
+      </div>
+
+
+      <div class="diagram arch">
+        <div class="diagram-title">核心类图：UB 与 RDMA 面向 TENT 暴露同一套数据面契约</div>
+        <pre class="mermaid">
+classDiagram
+  direction TB
+
+  class Transport {
+    &lt;&lt;TENT transport contract&gt;&gt;
+    +install()
+    +uninstall()
+    +allocateSubBatch()
+    +freeSubBatch()
+    +submitTransferTasks()
+    +getTransferStatus()
+    +addMemoryBuffer()
+    +removeMemoryBuffer()
+    +getEstimatedBandwidth()
+    +supportsCancellation()
+    +cancelTransferTask()
+  }
+
+  class UbTransport {
+    &lt;&lt;TENT-native UB&gt;&gt;
+    +allocateSubBatch()
+    +submitTransferTasks()
+    +getTransferStatus()
+    +addMemoryBuffer()
+    +getEstimatedBandwidth()
+    +cancelTransferTask()
+  }
+
+  class RdmaTransport {
+    &lt;&lt;TENT RDMA&gt;&gt;
+    +allocateSubBatch()
+    +submitTransferTasks()
+    +getTransferStatus()
+    +addMemoryBuffer()
+    +getEstimatedBandwidth()
+    +cancelTransferTask()
+  }
+
+  class TransportSelector {
+    +selectTransport()
+  }
+
+  class SegmentManager {
+    +registerBuffer()
+    +lookupSegment()
+  }
+
+  class Platform {
+    &lt;&lt;shared runtime abstraction&gt;&gt;
+    +probe()
+    +memory / topology info
+  }
+
+  class UbTask {
+    +status
+    +totalBytes
+    +transferredBytes
+    +cancelRequested
+  }
+
+  class UbSlice {
+    +offset
+    +length
+    +retryCount
+    +endpointGeneration
+  }
+
+  class UbWorkers {
+    +submitBatch()
+    +selectPath()
+    +post()
+    +poll()
+  }
+
+  class UbContext
+  class UbEndpoint
+  class UbJfc
+  class UrmaAdapter
+
+  Transport &lt;|-- UbTransport
+  Transport &lt;|-- RdmaTransport
+  TransportSelector --> Transport : only depends on common API
+  SegmentManager --> UbTransport
+  SegmentManager --> RdmaTransport
+  Platform --> UbTransport
+  Platform --> RdmaTransport
+
+  UbTransport --> UbTask
+  UbTask --> UbSlice
+  UbSlice --> UbWorkers
+  UbWorkers --> UbContext
+  UbWorkers --> UbEndpoint
+  UbWorkers --> UbJfc
+  UbEndpoint --> UrmaAdapter
+        </pre>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>共同数据面接口</th><th>UB</th><th>RDMA</th><th>TENT 看到的语义</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><strong>install / uninstall</strong></td><td>初始化/释放 URMA 资源</td><td>初始化/释放 RDMA 资源</td><td>Transport 生命周期</td></tr>
+            <tr><td><strong>allocateSubBatch / freeSubBatch</strong></td><td>UB 子批次</td><td>RDMA 子批次</td><td>统一 batch 生命周期</td></tr>
+            <tr><td><strong>submitTransferTasks</strong></td><td>Request → UbTask / UbSlice</td><td>进入 RDMA transport 的任务执行</td><td>统一 READ / WRITE 提交入口</td></tr>
+            <tr><td><strong>getTransferStatus</strong></td><td>汇总 UB task/slice 状态</td><td>汇总 RDMA 任务状态</td><td>统一完成/失败查询</td></tr>
+            <tr><td><strong>add/removeMemoryBuffer</strong></td><td>注册/释放 URMA segment</td><td>注册/释放 RDMA MR</td><td>统一内存注册接口</td></tr>
+            <tr><td><strong>getEstimatedBandwidth</strong></td><td>UB path / rail 估计</td><td>RDMA path 估计</td><td>供 selector / scheduler 使用</td></tr>
+            <tr><td><strong>supportsCancellation / cancelTransferTask</strong></td><td>UB task 取消语义</td><td>RDMA 取消语义</td><td>统一任务控制能力</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="callout green"><strong>Native 的关键：</strong> UB 与 RDMA 不要求底层资源模型完全相同；需要相同的是面向 TENT Runtime 的 Transport 契约。TENT 管“任务、状态、内存、调度语义”，各后端只负责把这些语义落实到 URMA 或 RDMA primitives。</div>
+
+      <div class="diagram">
+        <div class="diagram-title">Native 时序：直接创建 UbTask / UbSlice</div>
+        <pre class="mermaid">
+sequenceDiagram
+  participant APP as Store
+  participant TENT as TENT Runtime
+  participant UB as Native UB Transport
+  participant W as UbWorkers
+  participant EP as UbEndpoint
+  participant UA as UrmaAdapter
+  participant HW as UB NIC / JFC
+
+  APP->>TENT: submit(Request)
+  TENT->>UB: submitTransferTasks()
+  rect rgb(221,245,227)
+    UB->>UB: create UbTask
+    UB->>UB: slice → UbSlice[]
+    UB->>W: submitBatch(slices)
+  end
+  rect rgb(255,240,204)
+    W->>W: selectPath()
+    W->>EP: get endpoint
+  end
+  EP->>UA: post(slice)
+  UA->>HW: URMA post
+  HW-->>UA: CQE
+  UA-->>W: completion
+  W->>UB: update UbTask
+  UB-->>TENT: Task Complete
+  TENT-->>APP: Complete
+        </pre>
+      </div>
+
+      <div class="grid3">
+        <div class="card"><h3>结构收益</h3><p>去掉 Classic TE 中间层，数据路径归属清晰，TENT 真正成为统一传输框架。</p></div>
+        <div class="card"><h3>调度收益</h3><p>路径选择、slice、重试、带宽估计等能力可以在同一套 TENT 语义下扩展。</p></div>
+        <div class="card"><h3>生态收益</h3><p>UB 接入方式与 RDMA 等 transport 更接近，为统一抽象和后续开源维护降低成本。</p></div>
+      </div>
+    </section>
+
+    <section class="section" id="warmup">
+      <div class="section-head">
+        <div class="num">02</div>
+        <div>
+          <h2>Warmup：把首次建链成本移出业务热路径</h2>
+          <div class="lead">
+            问题不在单次握手有多慢，而在冷启动时大量 GET/WRITE 同时发现“没有可复用连接”，于是把 metadata、
+            socket handshake 和 endpoint 创建集中压到同一个时间窗口，形成连接风暴。
+          </div>
+          <div class="badge-row">
+            <span class="badge green">主动预热</span>
+            <span class="badge amber">有界目标数</span>
+            <span class="badge blue">复用原 TE handshake</span>
+            <span class="badge red">消除业务首访突发</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="callout"><strong>关键定义：</strong> Warmup 不是 KV 数据预加载，而是通过一次真实的小型 READ-only probe，提前走完 remote metadata → handshake → endpoint → transfer 的初始化路径。</div>
+
+      <div class="diagram arch">
+        <div class="diagram-title">Warmup 整体架构</div>
+        <pre class="mermaid">
+flowchart LR
+  subgraph CTRL["控制面"]
+    direction TB
+    S["Store Client 初始化"] --> W["Warmup Manager"]
+    W --> L["ListWarmupTargets"]
+    L --> M["Master"]
+    M -->|"有界 targets"| W
+  end
+
+  subgraph INIT["连接初始化"]
+    direction TB
+    O["openSegment()"] --> META["Remote Metadata"] --> HS["Socket Handshake"] --> EP["RDMA / UB / TCP Endpoint"]
+  end
+
+  subgraph PROBE["Warmup Probe"]
+    direction TB
+    P["Small READ-only Probe"] --> EP2["复用已建立 Endpoint"]
+    P --> C["Cleanup Worker"]
+  end
+
+  W --> O
+  W --> P
+  EP --> EP2
+  B["后续真实 GET / WRITE"] -->|"直接复用"| EP2
+
+  classDef new fill:#ddf5e3,stroke:#32a852,stroke-width:3px,color:#132;
+  classDef key fill:#fff0cc,stroke:#e39a20,stroke-width:3px,color:#321;
+  classDef core fill:#dfecff,stroke:#3973c6,stroke-width:2px,color:#123;
+  class W,L,P,C new;
+  class HS,EP key;
+  class M,O,META core;
+        </pre>
+      </div>
+
+
+      <div class="diagram arch">
+        <div class="diagram-title">核心类图：Warmup 控制面、传输面与资源清理</div>
+        <pre class="mermaid">
+classDiagram
+  direction LR
+
+  class Client {
+    +setup()
+    +warmup()
+  }
+
+  class MasterClient {
+    +ListWarmupTargets()
+  }
+
+  class WrappedMasterService {
+    +ListWarmupTargets(clientId, maxTargets, preferredProtocols)
+  }
+
+  class WarmupTarget {
+    +segmentName
+    +segmentId
+    +clientId
+    +protocol
+    +isLocal
+    +allowWarmup
+    +priority
+  }
+
+  class TransferEngine {
+    +openSegment()
+    +submitTransfer(READ)
+    +getTransferStatus()
+    +freeBatchID()
+  }
+
+  class ProbeResource {
+    +buffer
+    +batchId
+    +status
+  }
+
+  class CleanupWorker {
+    +poll()
+    +requeueOnStatusError()
+    +releaseOnTerminal()
+  }
+
+  Client --> MasterClient : query targets
+  MasterClient --> WrappedMasterService
+  WrappedMasterService --> WarmupTarget : returns bounded list
+  Client --> TransferEngine : open + READ probe
+  Client --> ProbeResource : create
+  CleanupWorker --> ProbeResource
+  CleanupWorker --> TransferEngine : query/release
+        </pre>
+      </div>
+
+      <div class="grid2">
+        <div class="card">
+          <h3>没有 Warmup</h3>
+          <ul>
+            <li>第一批业务请求同时触发 openSegment / metadata 查询。</li>
+            <li>多个请求并发进入 socket handshake。</li>
+            <li>listener / worker / 状态轮询被短时间突发放大。</li>
+            <li>结果体现为尾延迟、超时，极端情况下出现 hang / fail。</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>加入 Warmup</h3>
+          <ul>
+            <li>Client 初始化阶段先向 Master 获取有限数量目标。</li>
+            <li>对目标执行 READ-only probe，建立并缓存 transport endpoint。</li>
+            <li>资源清理与状态查询异步完成，避免影响真实请求。</li>
+            <li>业务流量到来后直接复用已建连接。</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="diagram">
+        <div class="diagram-title">Before：业务请求触发 handshake burst</div>
+        <pre class="mermaid">
+sequenceDiagram
+  participant R as 大量业务请求
+  participant C as Store Client
+  participant TE as Transfer Engine
+  participant H as Handshake Listener
+  participant P as Peer
+
+  rect rgb(255,225,225)
+    R->>C: GET / WRITE × N
+    par Request 1
+      C->>TE: openSegment()
+      TE->>H: handshake
+    and Request 2
+      C->>TE: openSegment()
+      TE->>H: handshake
+    and Request N
+      C->>TE: openSegment()
+      TE->>H: handshake
+    end
+    H->>P: 集中握手
+    Note over H,P: listener / metadata path 瞬时拥塞
+    P-->>H: response
+  end
+  H-->>TE: endpoint ready / timeout
+  TE-->>C: transfer / fail
+        </pre>
+      </div>
+
+      <div class="diagram">
+        <div class="diagram-title">After：初始化阶段有界预建链</div>
+        <pre class="mermaid">
+sequenceDiagram
+  participant C as Store Client
+  participant M as Master
+  participant TE as Transfer Engine
+  participant P as Peer
+  participant R as 真实业务请求
+
+  rect rgb(221,245,227)
+    C->>M: ListWarmupTargets(max_targets)
+    M-->>C: target segments
+    loop bounded targets
+      C->>TE: openSegment(target)
+      TE->>P: metadata / handshake
+      P-->>TE: endpoint ready
+      C->>TE: small READ-only probe
+      TE->>P: READ
+      P-->>TE: complete
+    end
+  end
+  R->>C: GET / WRITE × N
+  C->>TE: submit transfer
+  Note over C,TE: endpoint 已存在
+  TE->>P: direct data transfer
+        </pre>
+      </div>
+
+      <div class="callout amber"><strong>可靠性重点：</strong> cleanup 遇到 transfer status query error 时不能直接释放 probe buffer，因为“查询失败”并不能证明底层 READ 已经停止访问内存。正确策略是保留并重试，只有确认 terminal 后才释放。</div>
+    </section>
+
+    <section class="section" id="bucket">
+      <div class="section-head">
+        <div class="num">03</div>
+        <div>
+          <h2>Bucket 数据删除：从 metadata 删除到可靠的物理回收协议</h2>
+          <div class="lead">
+            LOCAL_DISK replica 可能位于远端 Store 节点，因此删除不能由发起者直接修改 SSD。
+            需要 Master 负责任务编排，真正持有数据的 Holder 负责持久化 tombstone，再由后台 GC 回收物理空间。
+          </div>
+          <div class="badge-row">
+            <span class="badge green">Holder-specific task</span>
+            <span class="badge amber">Fetch / ACK 协议</span>
+            <span class="badge amber">incarnation 校验</span>
+            <span class="badge blue">后台 GC</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="diagram arch">
+        <div class="diagram-title">可靠删除架构：控制面编排 + Holder 持久化 + GC</div>
+        <pre class="mermaid">
+flowchart LR
+  subgraph MASTER["Master"]
+    direction TB
+    U["RealClient<br/>Remove / BatchRemove"] --> M["Object Metadata"]
+    M --> G["生成 Holder-specific Tasks"]
+    G --> Q["Bounded Remove Queue"]
+    G -->|"全部成功入队后"| DEL["删除 Object Metadata"]
+  end
+
+  subgraph HOLDER["LOCAL_DISK Holder"]
+    direction TB
+    H["Heartbeat"] --> F["FetchRemoveTasks"]
+    F --> MR["BucketStorageBackend::MarkRemoved"]
+    MR --> CK["校验 tenant / key / incarnation"]
+    CK --> D["tmp → fsync → rename → fsync(parent)"]
+    D --> A["AckRemoveTasks"]
+  end
+
+  subgraph GCBOX["Background GC"]
+    direction TB
+    GC["GC Worker"] --> CP["Bucket Compaction"] --> R["回收 SSD 物理空间"]
+  end
+
+  Q --> F
+  A --> Q
+  D --> GC
+
+  classDef new fill:#ddf5e3,stroke:#32a852,stroke-width:3px,color:#132;
+  classDef key fill:#fff0cc,stroke:#e39a20,stroke-width:3px,color:#321;
+  classDef core fill:#dfecff,stroke:#3973c6,stroke-width:2px,color:#123;
+  class G,Q,F,MR,A,GC new;
+  class CK,D key;
+  class U,M,H,CP,R,DEL core;
+        </pre>
+      </div>
+
+
+      <div class="diagram arch">
+        <div class="diagram-title">核心类图：删除任务、Holder 持久化与独立 GC</div>
+        <pre class="mermaid">
+classDiagram
+  direction LR
+
+  class MasterService {
+    +Remove()
+    +BatchRemove()
+    +FetchRemoveTasks()
+    +AckRemoveTasks()
+  }
+
+  class RemoveTaskQueue {
+    +enqueue()
+    +fetchWithoutDelete()
+    +ackAndErase()
+    +capacity
+  }
+
+  class RemoveTask {
+    +taskId
+    +clientId
+    +tenantId
+    +key
+    +objectIncarnation
+    +replicaIdentity
+  }
+
+  class FileStorage {
+    +heartbeat()
+    +fetchRemoveTasks()
+    +ackRemoveTasks()
+  }
+
+  class BucketStorageBackend {
+    +MarkRemoved()
+    +persistMetadata()
+    +compactBucket()
+  }
+
+  class BucketGcWorker {
+    +start()
+    +scanCandidates()
+    +compact()
+    +stopAndJoin()
+  }
+
+  MasterService --> RemoveTaskQueue
+  RemoveTaskQueue o-- RemoveTask
+  FileStorage --> MasterService : heartbeat RPC
+  FileStorage --> BucketStorageBackend : execute task
+  BucketStorageBackend --> RemoveTask : validate incarnation
+  BucketGcWorker --> BucketStorageBackend : background GC
+        </pre>
+      </div>
+
+      <div class="grid3">
+        <div class="card">
+          <h3>任务不丢</h3>
+          <p>Fetch 只把任务交给 Holder，不立即从 Master 队列删除；只有 Holder 完成持久化并 ACK 后才移除。</p>
+        </div>
+        <div class="card">
+          <h3>重复投递安全</h3>
+          <p>MarkRemoved 必须幂等；RPC/ACK 丢失、Holder 重启时允许重新处理同一任务。</p>
+        </div>
+        <div class="card">
+          <h3>不会删错新对象</h3>
+          <p>任务携带 object incarnation / replica identity；旧任务遇到同 key 新对象时视为 stale task。</p>
+        </div>
+      </div>
+
+      <div class="diagram">
+        <div class="diagram-title">删除时序：持久化成功才 ACK，物理空间异步回收</div>
+        <pre class="mermaid">
+sequenceDiagram
+  participant U as RealClient
+  participant M as Master
+  participant Q as Remove Queue
+  participant H as Holder
+  participant B as BucketStorageBackend
+  participant GC as GC Worker
+
+  U->>M: Remove(key)
+  M->>M: 查 LOCAL_DISK replicas
+  rect rgb(221,245,227)
+    loop each holder replica
+      M->>Q: enqueue(holder-specific task)
+    end
+  end
+  Note over M,Q: 所有任务成功入队
+  M->>M: erase object metadata
+
+  H->>M: FetchRemoveTasks(max_tasks)
+  M-->>H: bounded task batch
+  rect rgb(255,240,204)
+    H->>B: MarkRemoved(task)
+    B->>B: validate tenant/key/incarnation
+    B->>B: write tmp + fsync
+    B->>B: atomic rename + fsync parent
+  end
+  B-->>H: durable
+  rect rgb(221,245,227)
+    H->>M: ACK(task_id)
+    M->>Q: remove task
+  end
+
+  GC->>B: scan tombstones
+  GC->>B: compact bucket
+  B-->>GC: reclaim old file
+        </pre>
+      </div>
+
+      <div class="callout green"><strong>核心价值：</strong> 把“逻辑删除成功”“删除任务不丢”“本地 tombstone 持久化”“物理 SSD 回收”拆成可验证的阶段，使 crash、RPC 丢包、重复投递都能得到清晰语义。</div>
+    </section>
+
+    <section class="section" id="hotcache">
+      <div class="section-head">
+        <div class="num">04</div>
+        <div>
+          <h2>HotCache：修复异步 Fill 与 Remove/Upsert 的 stale race</h2>
+          <div class="lead">
+            这个 bug 的关键不是“Remove 忘记删缓存”这么简单，而是异步 Fill 与 mutation 存在并发窗口：
+            mutation 前做了一次 invalidate，仍可能被更早启动的 Fill 在之后把旧地址重新写回 HotCache。
+          </div>
+          <div class="badge-row">
+            <span class="badge red">stale address</span>
+            <span class="badge green">two-phase invalidation</span>
+            <span class="badge amber">Remove / Upsert 一致性</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="diagram">
+        <div class="diagram-title">Before：单次 invalidate 无法阻止 racing Fill 回填旧值</div>
+        <pre class="mermaid">
+sequenceDiagram
+  participant G as GET Thread
+  participant HC as HotCache
+  participant S as Storage / Metadata
+  participant R as Remove / Upsert Thread
+
+  G->>HC: Get(key)
+  HC-->>G: MISS
+  G->>S: read old object V1
+  G->>G: async Fill(V1) pending
+
+  rect rgb(255,225,225)
+    R->>HC: invalidate(key)
+    R->>S: Remove / Upsert
+    Note over G,R: 并发窗口
+    G->>HC: delayed Fill(V1)
+    Note over HC: 旧地址重新进入 HotCache
+  end
+
+  S-->>R: mutation success
+  G->>HC: next Get
+  HC-->>G: stale V1
+        </pre>
+      </div>
+
+      <div class="diagram">
+        <div class="diagram-title">After：成功路径第二次 invalidate 封闭并发窗口</div>
+        <pre class="mermaid">
+sequenceDiagram
+  participant R as Remove / Upsert
+  participant HC as HotCache
+  participant S as Storage / Metadata
+  participant F as Racing Async Fill
+
+  rect rgb(221,245,227)
+    R->>HC: ① pre-mutation invalidate
+  end
+  R->>S: Remove / Upsert
+  rect rgb(255,225,225)
+    F->>HC: racing Fill(old V1)
+  end
+  S-->>R: mutation success
+  rect rgb(221,245,227)
+    R->>HC: ② success-side invalidate
+    Note over HC: 清掉窗口内重新插入的 stale entry
+  end
+        </pre>
+      </div>
+
+      <div class="arrowline">
+        <div class="flowbox"><strong>旧逻辑</strong><div class="flowline">invalidate
+↓
+mutation
+↑
+🔴 async fill 可在窗口中回写 V1</div></div>
+        <div class="arrowmid">→</div>
+        <div class="flowbox"><strong>修复逻辑</strong><div class="flowline">🟢 invalidate
+↓
+mutation
+↓
+🟢 invalidate again
+↓
+最终缓存状态与 mutation 对齐</div></div>
+      </div>
+
+      <div class="callout"><strong>适用范围：</strong> 同类问题不仅存在于 Remove；Upsert / BatchUpsert 成功路径如果会让旧 BufferDesc / 地址失效，也需要保证 HotCache 不保留旧映射。</div>
+    </section>
+
+    <section class="section" id="rdma">
+      <div class="section-head">
+        <div class="num">05</div>
+        <div>
+          <h2>RDMA 少一跳：从 Requester Pull 改为 Target Push</h2>
+          <div class="lead">
+            远端 SSD read 原方案要求 Target 先读到 staging buffer，再把 staging 地址返回给 Requester，
+            由 Requester 发 RDMA READ 拉取，最后还要释放 staging buffer。优化思路是让 Requester 一开始就暴露目标 buffer，
+            Target 读完 SSD 后直接 RDMA WRITE。
+          </div>
+          <div class="badge-row">
+            <span class="badge green">RDMA WRITE Push</span>
+            <span class="badge red">移除二次 Pull</span>
+            <span class="badge amber">减少同步等待</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="diagram arch">
+        <div class="diagram-title">数据路径对比：Pull vs Push</div>
+        <pre class="mermaid">
+flowchart LR
+  subgraph OLD["原方案 · RDMA READ Pull"]
+    R1["Requester"] -->|"① Read RPC"| T1["Target"]
+    SSD1["SSD"] -->|"② pread"| ST1["Target Staging"]
+    T1 -->|"③ staging addr/rkey"| R1
+    R1 -->|"④ RDMA READ"| ST1
+    R1 -->|"⑤ release"| T1
+  end
+
+  subgraph NEW["优化 · RDMA WRITE Push"]
+    R2["Requester Destination"] -->|"① RPC + dst addr/rkey"| T2["Target"]
+    SSD2["SSD"] -->|"② pread"| ST2["Target Staging"]
+    ST2 -->|"🟢 ③ RDMA WRITE"| R2
+    T2 -->|"④ complete"| R2
+  end
+
+  classDef bad fill:#ffe1e1,stroke:#d64545,stroke-width:3px,color:#311;
+  classDef good fill:#ddf5e3,stroke:#32a852,stroke-width:3px,color:#132;
+  class R1,T1,ST1 bad;
+  class R2,T2,ST2 good;
+        </pre>
+      </div>
+
+      <div class="grid2">
+        <div class="card">
+          <div class="compare-title">Before</div>
+          <h3>Requester Pull</h3>
+          <p>Requester 需要等待 Target 准备 staging，再进行第二阶段 RDMA READ，并在结束后显式 release。</p>
+          <div class="flowline">RPC → SSD Read → 返回 staging
+→ RDMA READ → Release</div>
+        </div>
+        <div class="card">
+          <div class="compare-title">After</div>
+          <h3>Target Push</h3>
+          <p>Requester 的目标地址随初始 RPC 一次性传给 Target；Target SSD Read 完成后直接 WRITE 到最终 buffer。</p>
+          <div class="flowline">RPC(dst info) → SSD Read
+→ 🟢 RDMA WRITE → Complete</div>
+        </div>
+      </div>
+
+      <div class="diagram">
+        <div class="diagram-title">Before：两个主要同步阶段</div>
+        <pre class="mermaid">
+sequenceDiagram
+  participant R as Requester
+  participant T as Target
+  participant SSD as Target SSD
+  participant S as Staging
+  rect rgb(255,225,225)
+    R->>T: Read RPC
+    T->>SSD: pread()
+    SSD-->>S: data
+    T-->>R: staging addr / rkey
+    Note over R,T: wait #1
+    R->>S: RDMA READ
+    S-->>R: data
+    Note over R,T: wait #2
+    R->>T: Release staging
+  end
+        </pre>
+      </div>
+
+      <div class="diagram">
+        <div class="diagram-title">After：Target 直接写入 Requester 最终 Buffer</div>
+        <pre class="mermaid">
+sequenceDiagram
+  participant R as Requester Buffer
+  participant T as Target
+  participant SSD as Target SSD
+  participant S as Staging
+  rect rgb(221,245,227)
+    R->>T: Read RPC(dst addr + rkey)
+    T->>SSD: pread()
+    SSD-->>S: data
+    S->>R: RDMA WRITE
+    T-->>R: Complete
+  end
+  Note over R,T: Requester 不再额外发起 RDMA READ
+        </pre>
+      </div>
+
+      <div class="callout green"><strong>核心收益：</strong> 不需要修改 RDMA 的基本能力，主要改变 Store 层的数据编排：充分利用已有 WRITE opcode，把“目标节点准备好数据后等对端来拉”改成“目标节点准备好后主动写到最终目的地”。</div>
+    </section>
+
+    <section class="section" id="ssd">
+      <div class="section-head">
+        <div class="num">06</div>
+        <div>
+          <h2>SSD 负载均衡：从随机选择到资源反馈闭环</h2>
+          <div class="lead">
+            随机分配只保证概率均匀，不知道各 Holder 的真实 SSD 空闲率。
+            `SSD_FREE_RATIO_FIRST` 的目标是让 Master 把 SSD 视为一种可度量资源，并优先选择更空闲的节点。
+          </div>
+          <div class="badge-row">
+            <span class="badge green">SSD_FREE_RATIO_FIRST</span>
+            <span class="badge amber">ssd_used_bytes 闭环</span>
+            <span class="badge blue">Master-side allocation</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="diagram arch">
+        <div class="diagram-title">基于 SSD 空闲率的 Holder 选择</div>
+        <pre class="mermaid">
+flowchart LR
+  subgraph MASTER["Master Allocation"]
+    direction TB
+    R["Object Offload Request"] --> A["Allocation Strategy"]
+    A --> S["SSD Usage Statistics"]
+    S --> C["计算 free_ratio"]
+    C --> P["SSD_FREE_RATIO_FIRST"]
+  end
+
+  subgraph HOLDERS["LOCAL_DISK Holders"]
+    direction TB
+    H1["Holder A · Used 80%"]
+    H2["Holder B · Used 45%"]
+    H3["Holder C · Used 20%"]
+  end
+
+  H1 -->|"usage"| S
+  H2 -->|"usage"| S
+  H3 -->|"usage"| S
+  P -. "skip" .-> H1
+  P -. "skip" .-> H2
+  P -->|"🟢 prefer"| H3
+  H3 -->|"allocation 后更新 used_bytes"| S
+
+  classDef good fill:#ddf5e3,stroke:#32a852,stroke-width:3px,color:#132;
+  classDef bad fill:#ffe1e1,stroke:#d64545,stroke-width:3px,color:#311;
+  classDef key fill:#fff0cc,stroke:#e39a20,stroke-width:3px,color:#321;
+  class H3,P good;
+  class H1 bad;
+  class S,C key;
+        </pre>
+      </div>
+
+      <div class="diagram arch">
+        <div class="diagram-title">真正关键的是统计闭环：分配要加，删除也必须减</div>
+        <pre class="mermaid">
+flowchart LR
+  AL["Allocate LOCAL_DISK"] -->|"+"| U["ssd_used_bytes"]
+  U --> F["free_ratio"]
+  F --> S["Next Allocation"]
+  D["Remove / GC"] -->|"🟢 -"| U
+
+  classDef good fill:#ddf5e3,stroke:#32a852,stroke-width:3px,color:#132;
+  classDef key fill:#fff0cc,stroke:#e39a20,stroke-width:3px,color:#321;
+  class D good;
+  class U,F key;
+        </pre>
+      </div>
+
+      <div class="grid2">
+        <div class="card">
+          <h3>只有“加”没有“减”会怎样</h3>
+          <p>对象已经删除、物理空间也可能回收，但 Master 的统计不回退，节点会被永久误判为更满，后续策略持续避开它。</p>
+        </div>
+        <div class="card">
+          <h3>正确的资源模型</h3>
+          <p>allocation、remove、metadata cleanup、GC 对 SSD 使用量的影响必须形成一致的 accounting 边界，否则调度算法再合理也会被错误输入破坏。</p>
+        </div>
+      </div>
+
+      <div class="callout amber"><strong>系统视角：</strong> SSD 负载均衡的真正难点不是“比较 free ratio”，而是保证 free ratio 的来源可信、及时，并与对象生命周期保持一致。</div>
+    </section>
+
+
+    <section class="section" id="community">
+      <div class="section-head">
+        <div class="num">07</div>
+        <div>
+          <h2>社区运作：从发现问题到 PR 合入的完整闭环</h2>
+          <div class="lead">
+            技术实现之外，Mooncake 社区协作本身也是一套工程流程：先确认社区是否已有同类工作，
+            用 Issue 固化问题和设计边界，再通过可测试的 PR、CI、CODEOWNER 与 Review 逐步收敛到可合入状态。
+          </div>
+          <div class="badge-row">
+            <span class="badge blue">Issue / RFC</span>
+            <span class="badge green">PR + Tests</span>
+            <span class="badge amber">CI / CODEOWNER</span>
+            <span class="badge red">Review Closure</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="diagram arch">
+        <div class="diagram-title">端到端社区流程</div>
+        <pre class="mermaid">
+flowchart LR
+  A["查已有 Issue / PR"] --> B{"已有同类工作?"}
+  B -->|"有"| C["加入讨论 / 补充方案<br/>避免重复实现"]
+  B -->|"没有"| D["创建 Issue / RFC"]
+  D --> E["基于 upstream/main<br/>建立功能分支"]
+  E --> F["实现 + 回归测试"]
+  F --> G["format / pre-commit<br/>本地测试"]
+  G --> H["同步 upstream/main<br/>处理冲突"]
+  H --> I["提交 PR<br/>Fixes / Closes #Issue"]
+  I --> J["GitHub CI"]
+  J --> K["Bot Review"]
+  K --> L["Maintainer / CODEOWNER Review"]
+  L --> M["修复问题 + 回复原因<br/>Resolve threads"]
+  M --> N{"Required checks<br/>+ approvals 完成?"}
+  N -->|"否"| F
+  N -->|"是"| O["Merge"]
+
+  classDef good fill:#ddf5e3,stroke:#32a852,stroke-width:3px,color:#132;
+  classDef key fill:#fff0cc,stroke:#e39a20,stroke-width:3px,color:#321;
+  classDef bad fill:#ffe1e1,stroke:#d64545,stroke-width:2px,color:#311;
+  class D,I,O good;
+  class J,L,N key;
+  class B,M bad;
+        </pre>
+      </div>
+
+      <div class="callout green"><strong>Issue 与 PR 的节奏：</strong> 如果已经完成定位、复现和初步实现，最有效的方式是 <strong>先开 Issue，紧接着开 PR</strong>，并在 PR 中写 <code>Fixes #xxx</code> / <code>Closes #xxx</code>。Issue 先固定问题归属和背景，PR 立即表明已有实现，避免只提 Issue 后长期空置或被其他人直接接走。</div>
+
+      <div class="grid2">
+        <div class="card">
+          <h3>先查社区，再开始实现</h3>
+          <div class="rule"><b>Issue</b><span>搜索同类 bug、feature request、RFC，尤其关注 open issue 是否已经有人认领。</span></div>
+          <div class="rule"><b>PR</b><span>同时搜索 open / closed PR，确认是否已有实现、废弃方案或 reviewer 明确拒绝过的方向。</span></div>
+          <div class="rule"><b>代码</b><span>检查 main 中是否已经以其他形式解决，不能只看 Issue/PR 标题。</span></div>
+          <div class="rule"><b>有重叠时</b><span>优先在已有 Issue 里说明补充方案，避免社区认为是在重复造轮子。</span></div>
+        </div>
+
+        <div class="card">
+          <h3>功能较大时怎么拆</h3>
+          <div class="rule"><b>每个 PR</b><span>应当能够独立编译、独立测试，并保持 main 可用。</span></div>
+          <div class="rule"><b>阶段拆分</b><span>优先按接口/基础设施 → 控制面 → 数据面 → 测试/文档拆，而不是按“写了多少代码”拆。</span></div>
+          <div class="rule"><b>Stacked PR</b><span>存在依赖时可以使用，但每一层都要明确 base；上游 PR 合入后及时把下一个 PR rebase 到 main。</span></div>
+          <div class="rule"><b>Commit</b><span>提交前整理成少量逻辑 commit；大量试错 commit 应 squash，避免 reviewer 阅读历史噪声。</span></div>
+        </div>
+      </div>
+
+      <div class="diagram arch">
+        <div class="diagram-title">代码提交流程：本地分支 → 自己的 Fork → 社区 PR</div>
+        <pre class="mermaid">
+flowchart LR
+  U["upstream/main<br/>kvcache-ai/Mooncake"] -->|"fetch"| L["本地仓库"]
+  L -->|"checkout -b feature"| B["功能分支"]
+  B -->|"实现 / 测试 / commit"| B
+  U -->|"rebase / merge latest main"| B
+  B -->|"push"| F["个人 / 公司 Fork"]
+  F -->|"Pull Request"| U
+
+  classDef good fill:#ddf5e3,stroke:#32a852,stroke-width:3px,color:#132;
+  classDef core fill:#dfecff,stroke:#3973c6,stroke-width:2px,color:#123;
+  class B,F good;
+  class U,L core;
+        </pre>
+      </div>
+
+      <div class="grid2">
+        <div class="card">
+          <h3>推荐的提交前命令链</h3>
+          <div class="codebox">git fetch upstream
+git checkout -b feature-name upstream/main
+
+# ... implement ...
+
+./scripts/code_format.sh
+pre-commit run --all-files
+
+# 跑与修改范围对应的 unit / integration tests
+
+git fetch upstream
+git rebase upstream/main
+
+git status
+git log --oneline upstream/main..HEAD
+
+git push origin feature-name</div>
+          <p class="small">如果 PR 已经公开，再改写历史要谨慎；个人 fork 必须改写时使用 <code>--force-with-lease</code>，不要无保护地 force push。</p>
+        </div>
+
+        <div class="card">
+          <h3>提交前代码状态</h3>
+          <div class="rule"><b>Scope</b><span>没有与当前 PR 无关的顺手重构或格式化。</span></div>
+          <div class="rule"><b>Commit</b><span>逻辑清楚，必要时 squash；大功能按阶段拆分。</span></div>
+          <div class="rule"><b>Base</b><span>基于最新或足够新的 upstream/main，无未处理冲突。</span></div>
+          <div class="rule"><b>Format</b><span><code>code_format.sh</code>、pre-commit、codespell 等本地检查通过。</span></div>
+          <div class="rule"><b>Tests</b><span>测试结果与 PR 描述一致，不能把 mock 说成真实硬件验证。</span></div>
+        </div>
+      </div>
+
+      <h3 style="margin-top:30px">CI：什么时候触发，哪些状态必须关注</h3>
+      <div class="grid2">
+        <div class="card">
+          <h3>触发方式</h3>
+          <div class="rule"><b>打开 PR</b><span>创建 PR 后 GitHub Actions 按仓库的 <code>pull_request</code> / workflow 条件启动。</span></div>
+          <div class="rule"><b>Push 新 commit</b><span>PR 分支更新会触发新的 checks；我们多次通过这种方式验证修复后的 CI。</span></div>
+          <div class="rule"><b>Rebase / Sync</b><span>只要产生新的 HEAD，同样会重新跑对应工作流。</span></div>
+          <div class="rule"><b>改 CI 文件</b><span>如果修改 <code>.github/workflows/*</code>，除了 CI 自身通过，还可能额外触发 <code>.github</code> 的 CODEOWNER 审批要求。</span></div>
+        </div>
+
+        <div class="card">
+          <h3>我们实际遇到的 Native UB CI</h3>
+          <div class="codebox">Build & Test (Linux)
+└─ tent-ci (ub-mock)
+   ├─ Configure project with TENT   ✅
+   ├─ Build project with TENT       ✅
+   ├─ Test (TENT)                   ✅
+   └─ CI Gate                       ✅</div>
+          <p>这证明的是 <strong>mock UB 构建、链接、TENT 单测和 CI matrix</strong> 正常，不等价于真实 UB 网卡、liburma 双节点数据传输已经验证。</p>
+        </div>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Check / 状态</th><th>应该如何判断</th><th>处理原则</th></tr></thead>
+          <tbody>
+            <tr>
+              <td><strong>Build & Test / relevant matrix</strong></td>
+              <td><span class="status-ok">需要通过</span></td>
+              <td>与本次改动相关的构建和测试 job 是最基本的合入门槛。</td>
+            </tr>
+            <tr>
+              <td><strong>CI Gate / Required checks</strong></td>
+              <td><span class="status-ok">需要通过</span></td>
+              <td>最终以 PR merge box / Required 标记为准；Required 失败不能当作“环境问题”直接忽略。</td>
+            </tr>
+            <tr>
+              <td><strong>format / pre-commit / codespell</strong></td>
+              <td><span class="status-ok">应通过</span></td>
+              <td>尽量本地提前解决，避免把纯格式问题留给 CI。</td>
+            </tr>
+            <tr>
+              <td><strong>Qoder Review = skipped</strong></td>
+              <td><span class="status-skip">不需要变成 success</span></td>
+              <td>我们遇到的 fork / cross-repo PR 中 Qoder 会被设计为 skipped；skipped 本身不是 CI failure。</td>
+            </tr>
+            <tr>
+              <td><strong>条件不匹配的 matrix job = skipped</strong></td>
+              <td><span class="status-skip">正常</span></td>
+              <td>平台、路径或 feature 条件未命中时可以跳过，不能把 skipped 与 failed 混为一谈。</td>
+            </tr>
+            <tr>
+              <td><strong>Codecov / 外部分析</strong></td>
+              <td><span class="status-check">看是否 Required</span></td>
+              <td>覆盖率是重要质量信号，但是否阻塞合并取决于仓库当时的 Required 配置；不能只看颜色判断。</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="callout amber"><strong>CI 判断原则：</strong> 不要问“是不是所有绿色都必须有”。真正的判断顺序是：先看该 check 是否与本次改动相关，再看它是否被仓库标记为 Required，最后看失败日志属于代码、测试、环境还是条件配置。</div>
+
+      <h3 style="margin-top:30px">CODEOWNERS：谁应该 Review</h3>
+      <div class="grid2">
+        <div class="card">
+          <h3>CODEOWNERS 是什么</h3>
+          <p>仓库用路径规则把代码目录映射到负责维护的人。PR 修改某个受保护目录后，GitHub 可以自动请求相应 owner review，并在 branch protection 下要求 owner approval。</p>
+          <div class="codebox">仓库中搜索：
+.github/CODEOWNERS
+CODEOWNERS
+docs/CODEOWNERS
+
+典型形式：
+/mooncake-store/        @...
+/mooncake-transfer-engine/tent/  @...
+.github/                @...</div>
+        </div>
+
+        <div class="card">
+          <h3>怎么决定 @ 谁</h3>
+          <div class="rule"><b>第一优先</b><span>PR 右侧 GitHub 自动请求的 Reviewers / Pending CODEOWNERS。</span></div>
+          <div class="rule"><b>第二优先</b><span>查看 <code>.github/CODEOWNERS</code>，按实际修改目录定位 owner。</span></div>
+          <div class="rule"><b>第三优先</b><span>看近期同模块 PR 中真正 review / merge 过的人。</span></div>
+          <div class="rule"><b>不要做</b><span>不要一次性 @ 大量无关 maintainer；已经 Approve 的 reviewer 不需要重复催。</span></div>
+        </div>
+      </div>
+
+      <div class="callout"><strong>我们遇到过的典型情况：</strong> 修改 TENT 代码需要 TENT owner；修改 Store 代码优先找 Store owner；如果同时修改 <code>.github/workflows/ci.yml</code>，即使代码 reviewer 已经 Approve，也可能因为 <code>.github</code> 路径本身需要额外 CODEOWNER approval 而暂时无法合并。</div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>路径</th><th>当前 main 中的 CODEOWNERS 示例</th><th>使用方式</th></tr></thead>
+          <tbody>
+            <tr>
+              <td><strong>/mooncake-store</strong></td>
+              <td><code>@ykwd @stmatengss @XucSh @YiXR</code></td>
+              <td>Store、Warmup、HotCache、SSD allocation / deletion 相关改动优先看这里。</td>
+            </tr>
+            <tr>
+              <td><strong>/mooncake-transfer-engine</strong></td>
+              <td><code>@alogfans @doujiang24 @chestnut-Q</code></td>
+              <td>Classic TE、transport 数据面、RDMA/UB 基础能力。</td>
+            </tr>
+            <tr>
+              <td><strong>/mooncake-transfer-engine/tent</strong></td>
+              <td><code>@alogfans @doujiang24 @chestnut-Q @staryxchen @00fish0 @dtcccc</code></td>
+              <td>TENT Runtime、Transport 接口、Native UB 等优先从这里选 reviewer。</td>
+            </tr>
+            <tr>
+              <td><strong>.github</strong></td>
+              <td><code>@stmatengss @ykwd @Ann-1024 @luketong777</code></td>
+              <td>修改 CI workflow / GitHub 配置时会额外进入这一组 owner 的审批范围。</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p class="small">具体 reviewer 以提交 PR 当时的 <code>.github/CODEOWNERS</code> 和 GitHub 自动请求结果为准；上表用于展示我们这套流程里实际涉及的模块映射。</p>
+
+
+      <h3 style="margin-top:30px">Review：Bot 和 Maintainer 的问题怎么处理</h3>
+      <div class="diagram arch">
+        <div class="diagram-title">Review 闭环</div>
+        <pre class="mermaid">
+flowchart LR
+  A["Bot / Maintainer Comment"] --> B{"问题类型"}
+  B -->|"正确性 / 生命周期"| C["先验证代码路径<br/>补 regression test"]
+  B -->|"架构 / scope"| D["重新确认模块边界<br/>必要时拆 PR"]
+  B -->|"风格 / 文档"| E["直接修复并跑 format"]
+  B -->|"判断不成立"| F["用代码事实 + 测试结果解释"]
+  C --> G["提交修复"]
+  D --> G
+  E --> G
+  F --> H["回复 rationale"]
+  G --> H
+  H --> I["Resolve conversation"]
+  I --> J["等待 re-review / approval"]
+        </pre>
+      </div>
+
+      <div class="grid2">
+        <div class="card">
+          <h3>Bot Review</h3>
+          <ul>
+            <li>适合发现格式、边界条件、潜在生命周期、测试覆盖等问题。</li>
+            <li>不能因为是 bot 就全部接受，也不能因为是 bot 就忽略。</li>
+            <li>先验证它指出的问题是否真的能沿代码路径发生，再决定修还是解释。</li>
+            <li>如果修复，最好用 regression test 证明问题确实被封住。</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>Maintainer Review</h3>
+          <ul>
+            <li>更关注模块边界、公共接口、长期维护成本和 PR scope。</li>
+            <li>设计方向被质疑时，不应只局部改代码；需要先确认 maintainer 想要的架构边界。</li>
+            <li>每个 comment 修复后回复“改了什么 + 为什么这样改 + 测试结果”。</li>
+            <li>过时 thread 即使代码已更新，也应确认是否需要手动 Resolve，避免 merge rule 阻塞。</li>
+          </ul>
+        </div>
+      </div>
+
+      <h3 style="margin-top:30px">测试要求：从单元正确性到真实硬件</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>层级</th><th>目的</th><th>适用示例</th><th>提交要求</th></tr></thead>
+          <tbody>
+            <tr><td><strong>Unit Test</strong></td><td>验证类/函数局部语义</td><td>allocation strategy、task queue、状态机</td><td>核心分支必须覆盖</td></tr>
+            <tr><td><strong>Regression Test</strong></td><td>稳定复现曾发生的 bug</td><td>HotCache stale、warmup status error</td><td>bugfix 最有价值的测试</td></tr>
+            <tr><td><strong>Integration Test</strong></td><td>验证跨模块路径</td><td>Store ↔ Master ↔ TE、删除 Fetch/ACK</td><td>接口改变时应补</td></tr>
+            <tr><td><strong>Concurrency / Repeat</strong></td><td>暴露 race、flaky、资源生命周期</td><td>Warmup burst、Remove vs Fill</td><td>并发问题不能只跑一次</td></tr>
+            <tr><td><strong>Mock Backend</strong></td><td>让 CI 无硬件也能验证数据面逻辑</td><td>TENT native UB <code>ub-mock</code></td><td>明确写“mock”，不夸大</td></tr>
+            <tr><td><strong>Real HW / E2E</strong></td><td>验证驱动、设备、跨节点、真实吞吐</td><td>UB/URMA、RDMA、LOCAL_DISK</td><td>若尚未完成，PR 中明确列为未验证项</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="callout red"><strong>测试描述的底线：</strong> “代码里有测试”“mock 通过”“单机通过”“双节点真实硬件通过”是四个不同等级。PR 的 Testing 段必须准确写到实际完成的那一级。</div>
+
+      <h3 style="margin-top:30px">Issue / PR 模板与提交前检查</h3>
+      <div class="grid2">
+        <div class="card">
+          <h3>Issue / RFC 模板</h3>
+          <div class="codebox">提交前：
+[ ] 已搜索相关 Issue / PR
+[ ] 已阅读相关文档，确认不是已有能力
+
+# [Bug / RFC] Title
+
+## Background / Motivation
+问题发生在哪里，为什么值得解决
+
+## Current behavior
+当前真实行为 / 数据路径
+
+## Reproduction
+触发条件、最小复现、日志或测试
+
+## Expected behavior
+预期语义
+
+## Root cause / Analysis
+已确认的根因；不确定部分明确标注
+
+## Proposal
+方案、架构图、时序图
+
+## Scope
+本次做什么 / 明确不做什么
+
+## Validation plan
+unit / integration / hardware / failure tests</div>
+        </div>
+
+        <div class="card">
+          <h3>PR 模板</h3>
+          <div class="codebox">## Description
+Fixes #&lt;issue&gt;
+
+## Module
+[ ] Transfer Engine
+[ ] Mooncake Store
+[ ] Integration / Common / CI / Docs ...
+只勾实际修改模块
+
+## Type of Change
+[ ] Bug fix
+[ ] New feature
+[ ] Refactor
+[ ] Breaking change
+[ ] Documentation update
+[ ] Performance improvement
+
+## How Has This Been Tested?
+Test commands:
+Test results:
+[ ] Unit tests pass
+[ ] Integration tests pass (if applicable)
+[ ] Manual testing done
+
+## Checklist
+[ ] self-review
+[ ] ./scripts/code_format.sh
+[ ] pre-commit run --all-files
+[ ] docs updated (if applicable)
+[ ] tests prove changes are effective
+[ ] changes &gt;500 LOC: RFC issue has been filed
+
+## AI Assistance Disclosure
+[ ] No AI tools were used
+[ ] AI tools were used (specify)</div>
+        </div>
+      </div>
+
+
+      <div class="callout amber"><strong>当前 PR 模板中的硬性自检项：</strong> 自审、运行 <code>./scripts/code_format.sh</code>、运行 <code>pre-commit run --all-files</code>、必要时更新文档、补充能够证明修改有效的测试；如果改动超过 <strong>500 LOC</strong>，模板要求先提交 RFC Issue。</div>
+
+      <div class="grid3">
+        <div class="card"><h3>提交前 · 代码</h3><p>无无关 diff；接口命名、错误处理、资源释放与社区已有风格一致；大块临时代码不直接进入 PR。</p></div>
+        <div class="card"><h3>提交前 · 文档</h3><p>Issue、PR、代码行为三者一致；不要让 PR 描述停留在旧设计；Module 只勾实际改到的模块。</p></div>
+        <div class="card"><h3>提交前 · Reviewability</h3><p>Reviewer 能从 PR 描述快速回答：为什么改、数据路径怎么变、风险在哪里、如何验证、哪些还没验证。</p></div>
+      </div>
+    </section>
+
+
+    <section class="section">
+      <div class="section-head">
+        <div class="num">Σ</div>
+        <div>
+          <h2>技术实现与社区协作的共同主线</h2>
+          <div class="lead">技术工作分散在 transport、Store、cache 和 allocation，社区工作覆盖 Issue、CI、Review 与测试；二者共同目标都是让变化可理解、可验证、可维护。</div>
+        </div>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>工作</th><th>原问题</th><th>关键改变</th><th>系统设计思想</th></tr></thead>
+          <tbody>
+            <tr><td><strong>UB → TENT</strong></td><td>双层 transport / 双模型</td><td>Classic Adapter → Native Task/Slice</td><td>减少架构耦合，统一抽象边界</td></tr>
+            <tr><td><strong>Warmup</strong></td><td>首次业务请求集中建链</td><td>初始化阶段有界预建链</td><td>把不可避免的冷启动成本前移</td></tr>
+            <tr><td><strong>Bucket Delete</strong></td><td>远端 SSD 删除缺乏可靠协议</td><td>Task → durable tombstone → ACK → GC</td><td>将逻辑正确性与物理回收解耦</td></tr>
+            <tr><td><strong>HotCache</strong></td><td>异步 Fill 可回写 stale address</td><td>两阶段 invalidate</td><td>封闭并发窗口，保证最终状态一致</td></tr>
+            <tr><td><strong>RDMA Direct</strong></td><td>Requester 二次 Pull</td><td>Target RDMA WRITE Push</td><td>减少同步点与中间网络交互</td></tr>
+            <tr><td><strong>SSD Balance</strong></td><td>随机分配不感知容量</td><td>free-ratio feedback</td><td>用可观测资源状态驱动调度</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="callout green"><strong>总体技术价值：</strong> 六项工作围绕 Mooncake 的关键数据路径形成统一演进方向：明确控制面与数据面的边界，将高并发下的不确定行为收敛为有界协议，并将资源与状态变化闭合为可验证的反馈链路。</div>
+    </section>
+
+    <footer class="footer">
+      Mooncake 关键技术工作与社区协作流程总结。网页中的颜色语义保持统一：
+      绿色为新增/优化，红色为原问题，蓝色为已有基础能力，橙色为关键控制与可靠性机制。
+    </footer>
+  </main>
+</div>
+
+<noscript>本页的架构图需要 JavaScript 才能渲染；正文、表格和代码内容仍可正常阅读。</noscript>
+
+<script type="module">
+import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+mermaid.initialize({
+  startOnLoad:true,
+  securityLevel:"loose",
+  theme:"base",
+  flowchart:{curve:"basis",htmlLabels:true},
+  sequence:{useMaxWidth:true,wrap:true},
+  themeVariables:{
+    fontFamily:'Inter, "PingFang SC", "Microsoft YaHei", sans-serif',
+    primaryTextColor:"#102033",
+    lineColor:"#426182",
+    signalColor:"#2f537a",
+    signalTextColor:"#14263d",
+    actorBorder:"#4b7098",
+    actorBkg:"#edf5ff",
+    actorTextColor:"#16324e",
+    noteBkgColor:"#fff4cf",
+    noteBorderColor:"#d8a743",
+    noteTextColor:"#3b2d0d",
+    labelBoxBkgColor:"#f1f6fb",
+    labelBoxBorderColor:"#8fa9c2"
+  }
+});
+</script>
+<script>
+if(window.self!==window.top)document.body.classList.add("embedded");
+const progress=document.getElementById("progress");
+const links=[...document.querySelectorAll("#nav a")];
+const sections=links.map(a=>document.querySelector(a.getAttribute("href"))).filter(Boolean);
+function update(){
+  const h=document.documentElement;
+  const max=h.scrollHeight-h.clientHeight;
+  progress.style.width=(max? (h.scrollTop/max*100):0)+"%";
+  let active=sections[0]?.id;
+  sections.forEach(s=>{if(s.getBoundingClientRect().top<180)active=s.id});
+  links.forEach(a=>a.classList.toggle("active",a.getAttribute("href")==="#"+active));
+}
+document.addEventListener("scroll",update,{passive:true});
+update();
+</script>
+</body>
+</html>
